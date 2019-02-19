@@ -1,5 +1,4 @@
-import casspackage.CassConnect
-import bcpackage.CassQueriesBinds
+import casspackage.{CassConnect, CassQueriesBinds}
 import com.datastax.driver.core.Session
 import org.scalatest.FunSuite
 
