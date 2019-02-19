@@ -10,7 +10,6 @@ import scala.util.{Failure, Success, Try}
   * Class just for opening Cassandra session and store it.
   */
 class CassConnect {
-
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   def getCassSession(node_address : String) : Try[Session] = {

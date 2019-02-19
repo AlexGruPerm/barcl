@@ -3,7 +3,7 @@ package bcpackage
 import com.datastax.driver.core.Session
 
 /**
-  * Class for encapsulate all queries and binds.
+  * Class for encapsulate all cql queries and binds for Cassandra.
   * @param session - Opened session to Cassandra.
   */
 class CassQueriesBinds(session : Session) {
