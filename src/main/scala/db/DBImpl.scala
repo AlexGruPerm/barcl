@@ -82,24 +82,22 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *  and for ticker_id=2 just 30 seconds.
     */
   private val bndBCalcProps = session.prepare(""" select * from mts_meta.bars_property """).bind()
-
   private val bndBars3600 = session.prepare(""" select * from mts_bars.td_bars_3600 """).bind()
 
-  private def dsBCalcProperty = {
-    session.execute(bndBCalcProps).all().iterator.asScala
-  }
-
-  private val rowToCalcProperty = (row : Row) => {
-    new CalcProperty(
-      row.getInt("ticker_id"),
-      row.getInt("bar_width_sec"),
-      row.getInt("is_enabled")
-    )
-  }
 
   def getAllCalcProperties= {
     require(!session.isClosed)
-    CalcProperties(dsBCalcProperty
+
+    val bndBCalcPropsDataSet = session.execute(bndBCalcProps).all().iterator.asScala
+
+    val rowToCalcProperty = (row : Row) =>
+      new CalcProperty(
+        row.getInt("ticker_id"),
+        row.getInt("bar_width_sec"),
+        row.getInt("is_enabled")
+      )
+
+    CalcProperties(bndBCalcPropsDataSet
       .toSeq.map(rowToCalcProperty)
       .sortBy(sr => sr.tickerId)(Ordering[Int])
       .sortBy(sr => sr.barDeepSec)(Ordering[Int]))
