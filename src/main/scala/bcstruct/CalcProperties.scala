@@ -1,4 +1,4 @@
-package bcpackage
+package bcstruct
 
 
 /**

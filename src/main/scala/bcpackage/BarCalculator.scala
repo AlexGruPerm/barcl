@@ -1,7 +1,7 @@
 package bcpackage
 
-import dbpackage.{QueriesBinds, DataSetOperations}
-import com.datastax.driver.core.Session
+import bcstruct.CalcProperties
+import db.{DBCass}
 import org.slf4j.LoggerFactory
 
 /**
@@ -9,17 +9,16 @@ import org.slf4j.LoggerFactory
   * @param session - opened session to Cassandra, must be checked on Success.
   *
   */
-class BarCalculator(session : Session) {
+class BarCalculator(nodeAddress :String, dbType :String) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   def run = {
     /**
-      * DataSetOperations hides DB query execution logic and converting data sets into seq of scala objects.
+      * dbSess hides DB query execution logic and converting data sets into seq of scala objects.
       * Lets us get necessary structures of data.
       */
-    val dsOper = new DataSetOperations(new QueriesBinds(session))
-
-    val allCalcProps :CalcProperties = dsOper.getAllCalcProperties
+    val dbSess = new DBCass(nodeAddress,dbType)
+    val allCalcProps :CalcProperties = dbSess.getAllCalcProperties
     logger.debug(" allCalcProps.cProps.size = "+allCalcProps.cProps.size)
   }
 

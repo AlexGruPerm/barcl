@@ -13,18 +13,12 @@ import scala.util.{Failure, Success}
 object BarsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
   val node: String = "193.124.112.90"
-  val session = (new DBConnector(node,"cassandra")).getDBSession
-  session match {
-    case Success(sess) => {
-    try {
-      (new BarCalculator(sess)).run
-    } catch {
+  val dbType: String = "cassandra"
+  try {
+    (new BarCalculator(node,dbType)).run
+  } catch {
       case ex: Throwable => ex.printStackTrace()
-    }
-     finally {
-      sess.close()
-     }
-    }
-    case Failure(f) => f.printStackTrace()
   }
+
 }
+
