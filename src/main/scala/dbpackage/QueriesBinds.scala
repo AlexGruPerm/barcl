@@ -1,4 +1,4 @@
-package casspackage
+package dbpackage
 
 import com.datastax.driver.core.Session
 import scala.collection.JavaConverters._
@@ -7,9 +7,10 @@ import scala.collection.JavaConverters._
   * Class for encapsulate all cql queries and binds for Cassandra.
   * @param session - Opened session to Cassandra.
   */
-class CassQueriesBinds(session : Session) {
+class QueriesBinds(session : AutoCloseable) {
   Option(session).orElse(throw new IllegalArgumentException("Null!"))
-  require(session.isClosed==false)
+  //require(session.isClosed==false)
+  //use pattern matching here to determine correct name of Class, Session, Connection...
 
   private val sess = session
 

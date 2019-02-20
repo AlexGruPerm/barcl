@@ -1,7 +1,7 @@
 package bcapp
 
 import bcpackage.BarCalculator
-import casspackage.CassConnect
+import dbpackage.DBConnector
 import com.datastax.driver.core.Session
 import org.slf4j.LoggerFactory
 
@@ -14,11 +14,10 @@ import scala.util.{Failure, Success, Try}
 object BarsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
   val node: String = "193.124.112.90"
-
   /**
   * Moving here from Session to DBSession DELIT.
   * */
-  val session : Try[Session] = (new CassConnect).getCassSession(node)
+  val session = (new DBConnector(node,"cassandra")).getDBSession
   session match {
     case Success(sess) => {
     try {

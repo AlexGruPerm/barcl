@@ -1,6 +1,6 @@
 package bcpackage
 
-import casspackage.{CassQueriesBinds, DataSetOperations}
+import dbpackage.{QueriesBinds, DataSetOperations}
 import com.datastax.driver.core.Session
 import org.slf4j.LoggerFactory
 
@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory
   * @param session - opened session to Cassandra, must be checked on Success.
   *
   */
-class BarCalculator(session : Session) {
+class BarCalculator(session : AutoCloseable) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   def run = {
@@ -17,7 +17,7 @@ class BarCalculator(session : Session) {
       * DataSetOperations hides Cassandra query execution logic and converting data sets into seq of scala objects.
       * Lets us get necessary structures of data.
       */
-    val dsOper = new DataSetOperations(new CassQueriesBinds(session))
+    val dsOper = new DataSetOperations(new QueriesBinds(session))
 
     val allCalcProps :CalcProperties = dsOper.getAllCalcProperties
     logger.debug(" allCalcProps.cProps.size = "+allCalcProps.cProps.size)

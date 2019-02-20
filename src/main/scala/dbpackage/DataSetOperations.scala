@@ -1,4 +1,4 @@
-package casspackage
+package dbpackage
 
 import bcpackage.{CalcProperties, CalcProperty}
 import com.datastax.driver.core.Row
@@ -6,7 +6,7 @@ import com.datastax.driver.core.Row
 /**
   * Contains functions to convert Cassandra Dataset rows into Scala objects.
   */
-class DataSetOperations(cassQueryBinds :CassQueriesBinds) {
+class DataSetOperations(cassQueryBinds :QueriesBinds) {
 
   private val rowToCalcProperty = (row : Row) => {
     new CalcProperty(
