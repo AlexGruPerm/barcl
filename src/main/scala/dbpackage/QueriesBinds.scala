@@ -7,24 +7,14 @@ import scala.collection.JavaConverters._
 
 /**
   * Class for encapsulate all cql queries and binds for Cassandra.
-  * @param session - Opened session to Cassandra.
+  * @param sess - Opened session to Cassandra.
   */
-class QueriesBinds(session : AutoCloseable) {
+class QueriesBinds(sess : Session) {
   val logger = LoggerFactory.getLogger(getClass.getName)
-  Option(session).orElse(throw new IllegalArgumentException("Null!"))
-
-  private val sess = session match {
-    case s: Session => s
-    //case c: Connection => c
-  }
-
-  logger.debug(s"sess.isClosed=["+sess.isClosed+"]")
-
-  require(sess.isClosed == true)
+  Option(sess).orElse(throw new IllegalArgumentException("Null!"))
+  require(sess.isClosed == false)
 
   //use pattern matching here to determine correct name of Class, Session, Connection...
-
-
 
   /**
     * Meta information, which tickers and which seconds deeps we need read for calculation.

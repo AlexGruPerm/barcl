@@ -6,7 +6,7 @@ import com.datastax.driver.core.Row
 /**
   * Contains functions to convert Cassandra Dataset rows into Scala objects.
   */
-class DataSetOperations(cassQueryBinds :QueriesBinds) {
+class DataSetOperations(queryBinds :QueriesBinds) {
 
   private val rowToCalcProperty = (row : Row) => {
     new CalcProperty(
@@ -17,7 +17,7 @@ class DataSetOperations(cassQueryBinds :QueriesBinds) {
   }
 
   def getAllCalcProperties= {
-    CalcProperties(cassQueryBinds.dsBCalcProperty
+    CalcProperties(queryBinds.dsBCalcProperty
       .toSeq.map(rowToCalcProperty)
       .sortBy(sr => sr.tickerId)(Ordering[Int])
       .sortBy(sr => sr.barDeepSec)(Ordering[Int]))

@@ -9,12 +9,12 @@ import org.slf4j.LoggerFactory
   * @param session - opened session to Cassandra, must be checked on Success.
   *
   */
-class BarCalculator(session : AutoCloseable) {
+class BarCalculator(session : Session) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   def run = {
     /**
-      * DataSetOperations hides Cassandra query execution logic and converting data sets into seq of scala objects.
+      * DataSetOperations hides DB query execution logic and converting data sets into seq of scala objects.
       * Lets us get necessary structures of data.
       */
     val dsOper = new DataSetOperations(new QueriesBinds(session))

@@ -6,11 +6,12 @@ version := "1.0"
 libraryDependencies ++= Seq(
   "com.datastax.cassandra" % "cassandra-driver-core" % "3.6.0",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
-  "org.postgresql" % "postgresql" % "42.2.5",
+ //"org.postgresql" % "postgresql" % "42.2.5",
   "org.scalatest" %% "scalatest" % "3.0.5" % Test
 )
 
-unmanagedJars in Compile := (file("/lib") ** "*.jar").classpath
+//for oracle jdbc driver.
+//unmanagedJars in Compile := (file("/lib") ** "*.jar").classpath
 
 assemblyMergeStrategy in assembly := {
   case PathList("org","aopalliance", xs @ _*) => MergeStrategy.last
