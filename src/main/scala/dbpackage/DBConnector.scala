@@ -37,7 +37,7 @@ class DBConnector(nodeAddress: String, dbType :String) {
   def getCassSession : Try[Session] =
     try {
       val session = Cluster.builder().addContactPoint(nodeAddress).build().connect()
-      logger.debug(s"$getClass.getName.getSession - Connection opened for [$dbType].")
+      logger.debug(s"($getClass.getName).getSession - Connection opened for [$dbType].")
       Success(session)
     } catch {
       case exHostAvail: NoHostAvailableException => exNoHostAvail(exHostAvail)

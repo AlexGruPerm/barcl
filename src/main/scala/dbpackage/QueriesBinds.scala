@@ -1,6 +1,8 @@
 package dbpackage
 
 import com.datastax.driver.core.Session
+import org.slf4j.LoggerFactory
+
 import scala.collection.JavaConverters._
 
 /**
@@ -8,11 +10,21 @@ import scala.collection.JavaConverters._
   * @param session - Opened session to Cassandra.
   */
 class QueriesBinds(session : AutoCloseable) {
+  val logger = LoggerFactory.getLogger(getClass.getName)
   Option(session).orElse(throw new IllegalArgumentException("Null!"))
-  //require(session.isClosed==false)
+
+  private val sess = session match {
+    case s: Session => s
+    //case c: Connection => c
+  }
+
+  logger.debug(s"sess.isClosed=["+sess.isClosed+"]")
+
+  require(sess.isClosed == true)
+
   //use pattern matching here to determine correct name of Class, Session, Connection...
 
-  private val sess = session
+
 
   /**
     * Meta information, which tickers and which seconds deeps we need read for calculation.
