@@ -2,7 +2,7 @@ package bcstruct
 
 
 /**
-  * Made as separate class for future. It is planning to add new members.
+  * It was made as separate class for future. It is planning to add new members.
   * @param cProps
   */
 case class CalcProperties(cProps :Seq[CalcProperty]){

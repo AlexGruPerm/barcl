@@ -1,10 +1,6 @@
 package bcapp
-
 import bcpackage.BarCalculator
-import dbpackage.DBConnector
 import org.slf4j.LoggerFactory
-
-import scala.util.{Failure, Success}
 
 /**
   * Main application for run bars calculation.
