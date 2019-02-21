@@ -32,7 +32,7 @@ class BarCalculator(nodeAddress :String, dbType :String) {
     for(tw <- allCalcProps.cProps) {
       logger.debug(tw.tickerId+" "+tw.barDeepSec)
     }
-
+    /* fast read from last_bars */
     /* MAIN CODE HERE ...........*/
 
   }
