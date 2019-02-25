@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
   * The Main class that contains all logic for bar calculation.
   *
   */
-class BarCalculator(nodeAddress :String, dbType :String) {
+class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   def run = {
@@ -27,6 +27,7 @@ class BarCalculator(nodeAddress :String, dbType :String) {
       * from DBImpl.
       * */
     val allCalcProps :CalcProperties = dbInst.getAllCalcProperties
+
     logger.debug(" Size of all bar calculator properties is "+allCalcProps.cProps.size)
 
     logger.debug("Calc property: -------------------------------------------------------------------------------------")
@@ -34,13 +35,18 @@ class BarCalculator(nodeAddress :String, dbType :String) {
       logger.debug(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" +
                    "  LASTBAR_DDATE=[" + cp.dDateLastBar + "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
                   cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick)
+      logger.debug(" First tick TS = "+cp.tsFirstTicks)
       logger.debug(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
         Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
+      val currReadInterval :(Long,Long) = (cp.beginFrom,cp.beginFrom+readBySecs*1000L)
+
+      logger.debug(s" In this iteration will read interval $currReadInterval")
+
       logger.debug(" ")
     }
     logger.debug("----------------------------------------------------------------------------------------------------")
 
-
+    /*Don't forget parallel (futures in loop) when read each tickers (ticks for bars calculation). */
 
 
     /* MAIN CODE HERE ...........*/

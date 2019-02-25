@@ -17,7 +17,7 @@ case class CalcProperty(tickerId      :Int,
                         dDateLastTick :Option[LocalDate],
                         tsLastTick    :Option[Long],
                         //-----------------
-                        tsBeginTicks : Option[Long]
+                        tsFirstTicks  :Option[Long]
                        ){
   /*
   REWRITE IT WITH getOrElse(0L)
@@ -38,12 +38,11 @@ case class CalcProperty(tickerId      :Int,
   },"TS End last bar must be less than TS End last tick.")
   */
 
-  val diffLastTickTSBarTS = tsLastTick.getOrElse(0L)/1000L -
-    tsEndLastBar.getOrElse(
-      tsBeginTicks.getOrElse(
-        tsLastTick.getOrElse(0L)))/1000L
+  val beginFrom = tsEndLastBar.getOrElse(
+    tsFirstTicks.getOrElse(
+      tsLastTick.getOrElse(0L)))
 
-
+  val diffLastTickTSBarTS = tsLastTick.getOrElse(0L)/1000L - beginFrom/1000L
 
 }
 
