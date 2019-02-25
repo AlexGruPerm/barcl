@@ -95,6 +95,16 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     val bndLastTickTs = session.prepare(""" select db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate limit 1 """).bind()
 
     /**
+      * ddate of First tick
+    */
+    val bndFirstTickDdate = session.prepare("""  select min(ddate) as ddate from mts_src.ticks_count_days where ticker_id = :tickerId; """).bind()
+
+    /**
+      * ts of first tick.
+    */
+    val bndFirstTickTs = session.prepare(""" select min(db_tsunx) as db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate """).bind()
+
+    /**
       * Func wide description:
     */
     val rowToCalcProperty = (rowCP: Row) => {
@@ -107,21 +117,21 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
           .setInt("barDeepSec", rowCP.getInt("bar_width_sec"))
       ).all().iterator.asScala.toSeq map (row => {
         new LastBar(
-          row.getDate("ddate"),//new Date(row.getDate("ddate").getMillisSinceEpoch),
+          row.getDate("ddate"),
           row.getLong("ts_end")
       )})).headOption
 
       /**
         * Last Tick only ddate
         */
-      val ltDdate : Option[LocalDate/*java.util.Date*/] = (session.execute(bndLastTickDdate
+      val ltDdate : Option[LocalDate] = (session.execute(bndLastTickDdate
         .setInt("tickerId", rowCP.getInt("ticker_id"))
-      ).all().iterator.asScala.toSeq map (row => row.getDate("ddate")) //new Date(row.getDate("ddate").getMillisSinceEpoch)
+      ).all().iterator.asScala.toSeq map (row => row.getDate("ddate"))
         ).headOption
 
       val ltTS :Option[Long] = ltDdate
       match {
-        case Some(ltd) => {//Some(1L)
+        case Some(ltd) => {
           (session.execute(bndLastTickTs
             .setInt("tickerId", rowCP.getInt("ticker_id"))
             .setDate("pDdate",ltd)
@@ -131,6 +141,22 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         case None => None
       }
 
+      def firstTickTS :Option[Long] = {
+        (session.execute(bndFirstTickDdate
+          .setInt("tickerId", rowCP.getInt("ticker_id"))
+        ).all().iterator.asScala.toSeq map (row => row.getDate("ddate"))).headOption
+        match {
+          case Some(firstDdate) => {
+            (session.execute(bndFirstTickTs
+              .setInt("tickerId", rowCP.getInt("ticker_id"))
+              .setDate("pDdate",  firstDdate)
+            ).all().iterator.asScala.toSeq map (row => row.getLong("db_tsunx"))
+              ).headOption
+          }
+          case None => None
+        }
+      }
+
       new CalcProperty(
         rowCP.getInt("ticker_id"),
         rowCP.getInt("bar_width_sec"),
@@ -138,7 +164,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         lb match {case Some(bar) => Some(bar.dDate) case _ => None},
         lb match {case Some(bar) => Some(bar.tsEnd) case _ => None},
         ltDdate,
-        ltTS
+        ltTS,
+        lb match {case Some(bar) => Some(bar.tsEnd) case _ => firstTickTS}
       )
     }
 

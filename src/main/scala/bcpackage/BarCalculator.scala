@@ -21,7 +21,7 @@ class BarCalculator(nodeAddress :String, dbType :String) {
                                        // "oracle"    => new DbOra(nodeAddress,dbType)
                                       }
     require(!dbInst.isClosed,s"Session to [$dbType] is closed.")
-    logger.debug(s"Session to [dbType] is opened. Continue.")
+    logger.debug(s"Session to [$dbType] is opened. Continue.")
     /**
       * Here we have object dbInst that generally not related with type of DB, it's just has necessary methods
       * from DBImpl.
@@ -33,8 +33,10 @@ class BarCalculator(nodeAddress :String, dbType :String) {
     for(cp <- allCalcProps.cProps) {
       logger.debug(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" +
                    "  LASTBAR_DDATE=[" + cp.dDateLastBar + "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
-                  cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick
-      )
+                  cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick)
+      logger.debug(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
+        Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
+      logger.debug(" ")
     }
     logger.debug("----------------------------------------------------------------------------------------------------")
 
