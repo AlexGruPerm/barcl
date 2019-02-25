@@ -29,20 +29,12 @@ class BarCalculator(nodeAddress :String, dbType :String) {
     val allCalcProps :CalcProperties = dbInst.getAllCalcProperties
     logger.debug(" Size of all bar calculator properties is "+allCalcProps.cProps.size)
 
-    /*
-    val  allLastBars :LastBars = dbInst.getLastBars(allCalcProps)
-    logger.debug(" Founded last bars "+allLastBars.lBars.size+" for enabled properties.")
-*/
-
-    //DELIT - FOR DEBUG
     logger.debug("Calc property: -------------------------------------------------------------------------------------")
     for(cp <- allCalcProps.cProps) {
-      logger.debug(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " isEnabled=["+cp.isEnabled+"]" +  "  ddate=["+cp.dDate+"] tsEnd=["+cp.tsEnd+"]")
-      /*
-      for (lb <- allLastBars.lBars.filter(thisLB => thisLB.tickerId == cp.tickerId && thisLB.barDeepSec == cp.barDeepSec)) {
-        logger.debug("   DDATE=[" + lb.dDate + "] TS_END=" + lb.tsEnd)
-      }
-      */
+      logger.debug(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" +
+                   "  LASTBAR_DDATE=[" + cp.dDateLastBar + "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
+                  cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick
+      )
     }
     logger.debug("----------------------------------------------------------------------------------------------------")
 

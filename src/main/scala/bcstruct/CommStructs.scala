@@ -1,15 +1,21 @@
 package bcstruct
 
+import com.datastax.driver.core.LocalDate
+
 
 /**
   * Meta Information about which ticker and which deeps will be calculated.
   *
   */
-case class CalcProperty(tickerId   :Int,
-                        barDeepSec :Int,
-                        isEnabled  :Int,
-                        dDate      :Option[java.util.Date],
-                        tsEnd      :Option[Long]
+case class CalcProperty(tickerId      :Int,
+                        barDeepSec    :Int,
+                        isEnabled     :Int,
+                        //-----------------
+                        dDateLastBar  :Option[LocalDate/*java.util.Date*/],
+                        tsEndLastBar  :Option[Long],
+                        //-----------------
+                        dDateLastTick :Option[LocalDate/*java.util.Date*/],
+                        tsLastTick    :Option[Long]
                        )
 
 /**
@@ -21,7 +27,7 @@ case class CalcProperties(cProps :Seq[CalcProperty]){
 /**
   * Last bar for key: ticker_id, barDeepSec
   */
-case class LastBar(dDate      :java.util.Date,
+case class LastBar(dDate      :LocalDate/*java.util.Date*/,
                    tsEnd      :Long)
 
 /**
