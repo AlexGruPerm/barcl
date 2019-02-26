@@ -1,6 +1,6 @@
 package db
 
-import bcstruct.{CalcProperties, CalcProperty, LastBar}
+import bcstruct._
 import com.datastax.driver.core.exceptions.NoHostAvailableException
 import com.datastax.driver.core.{Cluster, LocalDate, Row, Session}
 import org.slf4j.LoggerFactory
@@ -19,6 +19,8 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def close()
 
   def getAllCalcProperties : CalcProperties
+
+  def getTicksByInterval(tickerID :Int, tsBegin :Long, tsEnd :Long) : (seqTicksObj,Long)
 
 }
 
@@ -174,6 +176,40 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .sortBy(sr => sr.tickerId)(Ordering[Int])
       .sortBy(sr => sr.barDeepSec)(Ordering[Int])
     )
+  }
+
+
+
+  val bndTicksByTsInterval = session.prepare(
+    """ select ticker_id,ddate,db_tsunx,ask,bid
+            from mts_src.ticks
+           where ticker_id = :tickerId and
+                 db_tsunx >= :dbTsunxBegin and
+                 db_tsunx <= :dbTsunxEnd
+           allow filtering; """).bind()
+
+  val rowToSeqTicks = (rowT: Row) => {
+    new Tick(
+      rowT.getInt("ticker_id"),
+      rowT.getDate("ddate"),
+      rowT.getLong("db_tsunx"),
+      rowT.getDouble("ask"),
+      rowT.getDouble("bid")
+    )
+  }
+
+  /**
+    * Read and return seq of ticks for this ticker_id and interval by ts: tsBegin - tsEnd (unix timestamp)
+  */
+  def getTicksByInterval(tickerID :Int, tsBegin :Long, tsEnd :Long)  = {
+    val t1 = System.currentTimeMillis
+    val sqt = seqTicksObj(session.execute(bndTicksByTsInterval
+      .setInt("tickerId", tickerID)
+      .setLong("dbTsunxBegin", tsBegin)
+      .setLong("dbTsunxEnd", tsEnd)
+    ).all().iterator.asScala.toSeq.map(rowToSeqTicks))
+    val t2 = System.currentTimeMillis
+    (sqt,(t2-t1))
   }
 
 }

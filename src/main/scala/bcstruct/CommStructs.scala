@@ -62,3 +62,15 @@ case class LastBar(dDate      :LocalDate,
   * Contains all LastBar(s)
   */
 case class LastBars(lBars :Seq[LastBar])
+
+case class Tick(
+                 tickerId  :Int,
+                 dDate     :LocalDate,
+                 db_tsunx  :Long,
+                 ask       :Double,
+                 bid       :Double
+               )
+
+case class seqTicksObj(
+                    sqTicks :Seq[Tick]
+                   )

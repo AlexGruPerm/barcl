@@ -41,6 +41,8 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       val currReadInterval :(Long,Long) = (cp.beginFrom,cp.beginFrom+readBySecs*1000L)
 
       logger.debug(s" In this iteration will read interval $currReadInterval")
+      val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp.tickerId, currReadInterval._1, currReadInterval._2)
+      logger.debug("Duration of read ticks seq = "+ readMsec + " msecs. Read ["+seqTicks.sqTicks.size+"] ticks.")
 
       logger.debug(" ")
     }
@@ -48,6 +50,9 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
 
     /*Don't forget parallel (futures in loop) when read each tickers (ticks for bars calculation). */
 
+    /*
+
+    */
 
     /* MAIN CODE HERE ...........*/
 
