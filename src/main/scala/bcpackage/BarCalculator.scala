@@ -49,13 +49,6 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     logger.debug("----------------------------------------------------------------------------------------------------")
 
     /*Don't forget parallel (futures in loop) when read each tickers (ticks for bars calculation). */
-
-    /*
-
-    */
-
-    /* MAIN CODE HERE ...........*/
-
   }
 
 }
