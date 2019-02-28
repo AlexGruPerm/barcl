@@ -38,7 +38,15 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       logger.debug(" First tick TS = "+cp.tsFirstTicks)
       logger.debug(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
         Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
-      val currReadInterval :(Long,Long) = (cp.beginFrom,cp.beginFrom+readBySecs*1000L)
+
+      val currReadInterval :(Long,Long) = (cp.beginFrom,
+        Seq(cp.beginFrom+readBySecs*1000L,(
+          cp.tsLastTick match {
+            case Some(ts) => ts
+            case _ => cp.beginFrom
+          }
+        )).min
+      )
 
       logger.debug(s" In this iteration will read interval $currReadInterval")
       val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp.tickerId, currReadInterval._1, currReadInterval._2)
@@ -46,6 +54,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
 
       logger.debug(" ")
     }
+
     logger.debug("----------------------------------------------------------------------------------------------------")
 
     /*Don't forget parallel (futures in loop) when read each tickers (ticks for bars calculation). */

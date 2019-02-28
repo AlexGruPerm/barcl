@@ -146,7 +146,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       def firstTickTS :Option[Long] = {
         (session.execute(bndFirstTickDdate
           .setInt("tickerId", rowCP.getInt("ticker_id"))
-        ).all().iterator.asScala.toSeq map (row => row.getDate("ddate"))).headOption
+        ).all().iterator.asScala.toSeq map (row => row.getDate("ddate")) filter(ld => ld != null)   ).headOption
         match {
           case Some(firstDdate) => {
             (session.execute(bndFirstTickTs
