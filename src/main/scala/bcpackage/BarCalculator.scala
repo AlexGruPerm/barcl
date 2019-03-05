@@ -57,6 +57,9 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
 
       val bars :Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec*1000L)
       logger.debug(" bars.size="+bars.size)
+
+      dbInst.saveBars(bars)
+
       logger.debug(" ")
     }
     logger.debug("----------------------------------------------------------------------------------------------------")

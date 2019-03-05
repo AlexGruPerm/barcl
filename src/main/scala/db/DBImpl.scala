@@ -1,6 +1,7 @@
 package db
 
 import bcstruct._
+import com.datastax.driver.core
 import com.datastax.driver.core.exceptions.NoHostAvailableException
 import com.datastax.driver.core.{Cluster, LocalDate, Row, Session}
 import org.slf4j.LoggerFactory
@@ -21,6 +22,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllCalcProperties : CalcProperties
   def getTicksByInterval(tickerID :Int, tsBegin :Long, tsEnd :Long) : (seqTicksObj,Long)
   def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
+  def saveBars(seqBarsCalced :Seq[Bar])
 
 }
 
@@ -212,50 +214,125 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
 
+
   /**
     * Calculate seq of Bars from seq of Ticks.
     * @param seqTicks - seq of Ticks were read from DB in prev step.
     * @return
     */
-  def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar] ={
+  def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar] = {
 
     val barsSides = seqTicks.head.db_tsunx.to(seqTicks.last.db_tsunx).by(barDeepSec)
 
-    logger.info("- barsSides.size="+barsSides.size)
-    logger.info("from : "+seqTicks.head.db_tsunx)
-    logger.info("to   : "+seqTicks.last.db_tsunx)
+    logger.info("- barsSides.size=" + barsSides.size)
+    logger.info("from : " + seqTicks.head.db_tsunx)
+    logger.info("to   : " + seqTicks.last.db_tsunx)
 
-    val seqBarSides = barsSides.zipWithIndex.map(elm => (elm._1,elm._2))
-    logger.info("seqBarSides.size= "+seqBarSides.size)
+    val seqBarSides = barsSides.zipWithIndex.map(elm => (elm._1, elm._2))
+    logger.info("seqBarSides.size= " + seqBarSides.size)
 
-    val seqBar2Sides = for(i <- 0 to seqBarSides.size-1) yield {
+    val seqBar2Sides = for (i <- 0 to seqBarSides.size - 1) yield {
       if (i < seqBarSides.last._2)
-        (seqBarSides(i)._1, seqBarSides(i+1)._1, seqBarSides(i)._2+1)
+        (seqBarSides(i)._1, seqBarSides(i + 1)._1, seqBarSides(i)._2 + 1)
       else
-        (seqBarSides(i)._1, seqBarSides(i)._1, seqBarSides(i)._2+1)
+        (seqBarSides(i)._1, seqBarSides(i)._1, seqBarSides(i)._2 + 1)
     }
 
-
-    def getGroupThisElement(elm : Long)= {
+    def getGroupThisElement(elm: Long) = {
       seqBar2Sides.find(bs => ((bs._1 <= elm && bs._2 > elm) && (bs._2 - bs._1) == barDeepSec)).map(x => x._3).getOrElse(0)
     }
 
-    val seqSeqTicks = seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx)).filter(seqT => seqT._1!=0 ).toSeq.sortBy(gr => gr._1)
-    //Not last group where can be less then bar_width_sec
-    val seqBarsCalced = for (seqTicksOneBar <- seqSeqTicks if seqTicksOneBar._1 != 0 ) yield {
-      //logger.debug("          6. GROUP ID - seqTicksOneBar._1 = "+seqTicksOneBar._1)
-      new Bar(
-        p_ticker_id     = tickerId,
-        p_bar_width_sec = (barDeepSec/1000L).toInt,
-        barTicks        = seqTicksOneBar._2
-      )
-    }
-    seqBarsCalced
-
+    val seqSeqTicks: Seq[(Int, Seq[Tick])] = seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx)).filter(seqT => seqT._1 != 0).toSeq.sortBy(gr => gr._1)
+    seqSeqTicks.filter(sb => sb._1 != 0).map(elm => new Bar(tickerId, (barDeepSec / 1000L).toInt, elm._2))
   }
 
 
 
+  def saveBars(seqBarsCalced :Seq[Bar]) = {
+     require(seqBarsCalced.nonEmpty,"Seq of Bars for saving is Empty.")
+    /**
+      * Save one bar.
+      */
+    val bndSaveBar = session.prepare(
+      """
+        insert into mts_bars.bars(
+        	  ticker_id,
+        	  ddate,
+        	  bar_width_sec,
+            ts_begin,
+            ts_end,
+            o,
+            h,
+            l,
+            c,
+            h_body,
+            h_shad,
+            btype,
+            ticks_cnt,
+            disp,
+            log_co
+            )
+        values(
+        	  :p_ticker_id,
+        	  :p_ddate,
+        	  :p_bar_width_sec,
+            :p_ts_begin,
+            :p_ts_end,
+            :p_o,
+            :p_h,
+            :p_l,
+            :p_c,
+            :p_h_body,
+            :p_h_shad,
+            :p_btype,
+            :p_ticks_cnt,
+            :p_disp,
+            :p_log_co
+            ); """).bind()
+
+    val bndLastBars = session.prepare(
+      """
+        insert into mts_bars.last_bars(
+        	  ticker_id,
+        	  bar_width_sec,
+            ddate,
+            ts_end
+            )
+        values(
+        	  :p_ticker_id,
+        	  :p_bar_width_sec,
+            :p_ddate,
+            :p_ts_end
+            ); """).bind()
+
+      for (b <- seqBarsCalced) {
+        session.execute(bndSaveBar
+          .setInt("p_ticker_id", b.ticker_id)
+          .setDate("p_ddate",  core.LocalDate.fromMillisSinceEpoch(b.ddate)) //*1000
+          .setInt("p_bar_width_sec",b.bar_width_sec)
+          .setLong("p_ts_begin", b.ts_begin)
+          .setLong("p_ts_end", b.ts_end)
+          .setDouble("p_o",b.o)
+          .setDouble("p_h",b.h)
+          .setDouble("p_l",b.l)
+          .setDouble("p_c",b.c)
+          .setDouble("p_h_body",b.h_body)
+          .setDouble("p_h_shad",b.h_shad)
+          .setString("p_btype",b.btype)
+          .setInt("p_ticks_cnt",b.ticks_cnt)
+          .setDouble("p_disp",b.disp)
+          .setDouble("p_log_co",b.log_co))
+      }
+
+      //UPSERT LAST BAR FROM CALCED BARS seqBarsCalced
+      val lastBarFromBars = seqBarsCalced.filter(b => b.ts_end == seqBarsCalced.map(bfs => bfs.ts_end).max).head
+      session.execute(bndLastBars
+        .setInt("p_ticker_id", lastBarFromBars.ticker_id)
+        .setInt("p_bar_width_sec", lastBarFromBars.bar_width_sec)
+        .setDate("p_ddate", core.LocalDate.fromMillisSinceEpoch(lastBarFromBars.ddate)) //*1000
+        .setLong("p_ts_end", lastBarFromBars.ts_end)
+      )
+  }
 }
 
 object DBCass {
