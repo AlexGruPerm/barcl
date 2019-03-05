@@ -1,6 +1,6 @@
 package bcpackage
 
-import bcstruct.CalcProperties
+import bcstruct.{Bar, CalcProperties}
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
@@ -41,22 +41,25 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
 
       val currReadInterval :(Long,Long) = (cp.beginFrom,
         Seq(cp.beginFrom+readBySecs*1000L,(
-          cp.tsLastTick match {
-            case Some(ts) => ts
-            case _ => cp.beginFrom
-          }
+        cp.tsLastTick match {
+          case Some(ts) => ts
+          case _ => cp.beginFrom
+        }
         )).min
       )
 
-      logger.debug(s" In this iteration will read interval $currReadInterval")
+      logger.debug(s" In this iteration will read interval $currReadInterval for deepSecs="+cp.barDeepSec)
       val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp.tickerId, currReadInterval._1, currReadInterval._2)
       logger.debug("Duration of read ticks seq = "+ readMsec + " msecs. Read ["+seqTicks.sqTicks.size+"] ticks.")
 
+      logger.debug("EXTERNAL:  head.db_tsunx="+seqTicks.sqTicks.head.db_tsunx+" MIN(db_tsunx)="+seqTicks.sqTicks.map(t => t.db_tsunx).min)
+      logger.debug("EXTERNAL:  last.db_tsunx="+seqTicks.sqTicks.last.db_tsunx+" MAX(db_tsunx)="+seqTicks.sqTicks.map(t => t.db_tsunx).max)
+
+      val bars :Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec*1000L)
+      logger.debug(" bars.size="+bars.size)
       logger.debug(" ")
     }
-
     logger.debug("----------------------------------------------------------------------------------------------------")
-
     /*Don't forget parallel (futures in loop) when read each tickers (ticks for bars calculation). */
   }
 

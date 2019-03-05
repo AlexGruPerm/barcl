@@ -19,7 +19,7 @@ CREATE TABLE mts_meta.bars_property(
 insert into  mts_meta.bars_property(ticker_id,bar_width_sec,is_enabled) values(1,300,1);
 insert into  mts_meta.bars_property(ticker_id,bar_width_sec,is_enabled) values(2,300,1);
 insert into  mts_meta.bars_property(ticker_id,bar_width_sec,is_enabled) values(3,300,1)
-insert into  mts_meta.bars_property(ticker_id,bar_width_sec,is_enabled) values(1,30,0);--
+insert into  mts_meta.bars_property(ticker_id,bar_width_sec,is_enabled) values(1,30,0);
 
 ----------------------------------------------------------------------------------------------------------------------
 --

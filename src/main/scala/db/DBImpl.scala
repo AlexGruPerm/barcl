@@ -19,8 +19,8 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def close()
 
   def getAllCalcProperties : CalcProperties
-
   def getTicksByInterval(tickerID :Int, tsBegin :Long, tsEnd :Long) : (seqTicksObj,Long)
+  def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
 
 }
 
@@ -178,8 +178,6 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     )
   }
 
-
-
   val bndTicksByTsInterval = session.prepare(
     """ select ticker_id,ddate,db_tsunx,ask,bid
             from mts_src.ticks
@@ -188,9 +186,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                  db_tsunx <= :dbTsunxEnd
            allow filtering; """).bind()
 
-  val rowToSeqTicks = (rowT: Row) => {
+  val rowToSeqTicks = (rowT: Row, tickerID :Int) => {
     new Tick(
-      rowT.getInt("ticker_id"),
+      tickerID,//rowT.getInt("ticker_id"),
       rowT.getDate("ddate"),
       rowT.getLong("db_tsunx"),
       rowT.getDouble("ask"),
@@ -207,10 +205,56 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .setInt("tickerId", tickerID)
       .setLong("dbTsunxBegin", tsBegin)
       .setLong("dbTsunxEnd", tsEnd)
-    ).all().iterator.asScala.toSeq.map(rowToSeqTicks))
+    ).all().iterator.asScala.toSeq.map(r => rowToSeqTicks(r,tickerID)).sortBy(t => t.db_tsunx)
+    )
     val t2 = System.currentTimeMillis
     (sqt,(t2-t1))
   }
+
+
+  /**
+    * Calculate seq of Bars from seq of Ticks.
+    * @param seqTicks - seq of Ticks were read from DB in prev step.
+    * @return
+    */
+  def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar] ={
+
+    val barsSides = seqTicks.head.db_tsunx.to(seqTicks.last.db_tsunx).by(barDeepSec)
+
+    logger.info("- barsSides.size="+barsSides.size)
+    logger.info("from : "+seqTicks.head.db_tsunx)
+    logger.info("to   : "+seqTicks.last.db_tsunx)
+
+    val seqBarSides = barsSides.zipWithIndex.map(elm => (elm._1,elm._2))
+    logger.info("seqBarSides.size= "+seqBarSides.size)
+
+    val seqBar2Sides = for(i <- 0 to seqBarSides.size-1) yield {
+      if (i < seqBarSides.last._2)
+        (seqBarSides(i)._1, seqBarSides(i+1)._1, seqBarSides(i)._2+1)
+      else
+        (seqBarSides(i)._1, seqBarSides(i)._1, seqBarSides(i)._2+1)
+    }
+
+
+    def getGroupThisElement(elm : Long)= {
+      seqBar2Sides.find(bs => ((bs._1 <= elm && bs._2 > elm) && (bs._2 - bs._1) == barDeepSec)).map(x => x._3).getOrElse(0)
+    }
+
+    val seqSeqTicks = seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx)).filter(seqT => seqT._1!=0 ).toSeq.sortBy(gr => gr._1)
+    //Not last group where can be less then bar_width_sec
+    val seqBarsCalced = for (seqTicksOneBar <- seqSeqTicks if seqTicksOneBar._1 != 0 ) yield {
+      //logger.debug("          6. GROUP ID - seqTicksOneBar._1 = "+seqTicksOneBar._1)
+      new Bar(
+        p_ticker_id     = tickerId,
+        p_bar_width_sec = (barDeepSec/1000L).toInt,
+        barTicks        = seqTicksOneBar._2
+      )
+    }
+    seqBarsCalced
+
+  }
+
+
 
 }
 

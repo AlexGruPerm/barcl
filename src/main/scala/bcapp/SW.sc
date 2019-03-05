@@ -1,24 +1,9 @@
-//возвращающую список из всех не-None элементов списка.
+val keys = List(2, 5, 1)
 
-1551115965 568L/1000L
+val mk :Map[Int,List[Int]] = Map(1->List(11,12,13), 2->List(21,22,23), 5->List(51,52,53))
 
+//mk.get(x)
 
-/*
-val neg : PartialFunction[Option[Int], Int] = {
-  case Some(x) if x<0 => -1*x
-  case Some(x) if x>0 => x
-}
+val nums1 = keys.map(x => mk.get(x))
 
-val pos : PartialFunction[Option[Int], Int] = {
-  case Some(x) if x>0 && x<5 => x
-  case Some(x) if x>5        => x*2
-}
-
-List(Some(-10),None,Some(4),None,Some(-3),Some(10)) collect neg
-List(Some(-10),None,Some(4),None,Some(-3),Some(10)) collect pos
-
-val fcomm = neg orElse pos
-
-List(Some(-10),None,Some(4),None,Some(-3),Some(10)) collect fcomm
-*/
-
+val nums2 = keys.flatMap(x => mk.get(x))
