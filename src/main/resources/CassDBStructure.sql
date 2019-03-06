@@ -29,6 +29,7 @@ insert into  mts_meta.bars_property(ticker_id,bar_width_sec,is_enabled) values(1
 ----------------------------------------------------------------------------------------------------------------------
 drop TABLE mts_bars.last_bars;
 
+-- orig
 CREATE TABLE mts_bars.last_bars (
 	ticker_id int,
 	bar_width_sec int,
@@ -36,6 +37,16 @@ CREATE TABLE mts_bars.last_bars (
 	ts_end bigint,
 	PRIMARY KEY ((ticker_id,bar_width_sec), ddate)
 ) WITH  CLUSTERING ORDER BY (ddate DESC)
+and comment = 'Contains only last bars (ts_end) for each key; ticker_id,bar_width_sec,ddate';
+
+--new for multiple empty bars inside one ddate
+CREATE TABLE mts_bars.last_bars (
+	ticker_id int,
+	bar_width_sec int,
+	ddate date,
+	ts_end bigint,
+	PRIMARY KEY ((ticker_id,bar_width_sec), ddate, ts_end)
+) WITH  CLUSTERING ORDER BY (ddate DESC, ts_end DESC)
 and comment = 'Contains only last bars (ts_end) for each key; ticker_id,bar_width_sec,ddate';
 
 insert into mts_bars.last_bars(ticker_id,bar_width_sec,ddate,ts_end) values(1,300,'2019-02-08',1549662931724);
@@ -72,6 +83,25 @@ CREATE TABLE mts_src.ticks_count_days(
 
 ----------------------------------------------------------------------------------------------------------------------
 
+
+CREATE TABLE mts_bars.bars (
+	ticker_id int,
+	ddate date,
+	bar_width_sec int,
+	ts_end bigint,
+	btype text,
+	c double,
+	disp double,
+	h double,
+	h_body double,
+	h_shad double,
+	l double,
+	log_co double,
+	o double,
+	ticks_cnt int,
+	ts_begin bigint,
+	PRIMARY KEY (( ticker_id, ddate, bar_width_sec ), ts_end)
+) WITH CLUSTERING ORDER BY ( ts_end DESC );
 
 
 

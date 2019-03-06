@@ -23,6 +23,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getTicksByInterval(tickerID :Int, tsBegin :Long, tsEnd :Long) : (seqTicksObj,Long)
   def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
   def saveBars(seqBarsCalced :Seq[Bar])
+  def saveEmptyBar(pTickerId :Int,barDeepSec :Int, tsBegin :Long, tsEnd :Long)
 
 }
 
@@ -189,6 +190,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
           row.getDate("ddate"),
           row.getLong("ts_end")
       )})).headOption
+      //.sortBy(lb => lb.tsEnd)(Ordering[Long].reverse)
+
+      logger.debug(">>>>>>>>>> lb.getOrElse(0L)="+lb.getOrElse(0L))
 
       /**
         * Last Tick only ddate
@@ -337,6 +341,37 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         .setLong("p_ts_end", lastBarFromBars.ts_end)
       )
   }
+
+  def saveEmptyBar(pTickerId :Int,barDeepSec :Int, tsBegin :Long, tsEnd :Long) = {
+
+      session.execute(bndSaveBar
+        .setInt("p_ticker_id",pTickerId)
+        .setDate("p_ddate",  core.LocalDate.fromMillisSinceEpoch(tsEnd))
+        .setInt("p_bar_width_sec",barDeepSec)
+        .setLong("p_ts_begin", tsBegin)
+        .setLong("p_ts_end", tsEnd)
+        .setDouble("p_o",0)
+        .setDouble("p_h",0)
+        .setDouble("p_l",0)
+        .setDouble("p_c",0)
+        .setDouble("p_h_body",0)
+        .setDouble("p_h_shad",0)
+        .setString("p_btype", "n")
+        .setInt("p_ticks_cnt",0)
+        .setDouble("p_disp",0)
+        .setDouble("p_log_co",0))
+
+
+    //UPSERT LAST BAR FROM CALCED BARS seqBarsCalced
+    session.execute(bndLastBars
+      .setInt("p_ticker_id", pTickerId)
+      .setInt("p_bar_width_sec", barDeepSec)
+      .setDate("p_ddate", core.LocalDate.fromMillisSinceEpoch(tsEnd))
+      .setLong("p_ts_end", tsEnd)
+    )
+  }
+
+
 }
 
 object DBCass {
