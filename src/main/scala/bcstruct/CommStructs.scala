@@ -11,8 +11,10 @@ case class CalcProperty(tickerId      :Int,
                         barDeepSec    :Int,
                         isEnabled     :Int,
                         //-----------------
-                        dDateLastBar  :Option[LocalDate],
-                        tsEndLastBar  :Option[Long],
+                        dDateBeginLastBar  :Option[LocalDate],
+                        tsBeginLastBar     :Option[Long],
+                        dDateEndLastBar    :Option[LocalDate],
+                        tsEndLastBar       :Option[Long],
                         //-----------------
                         dDateLastTick :Option[LocalDate],
                         tsLastTick    :Option[Long],
@@ -55,8 +57,10 @@ case class CalcProperties(cProps :Seq[CalcProperty]){
 /**
   * Last bar for key: ticker_id, barDeepSec
   */
-case class LastBar(dDate      :LocalDate,
-                   tsEnd      :Long)
+case class LastBar(dDateBegin  :LocalDate,
+                   tsBegin     :Long,
+                   dDateEnd    :LocalDate,
+                   tsEnd       :Long)
 
 /**
   * Contains all LastBar(s)

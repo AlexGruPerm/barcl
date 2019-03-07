@@ -49,6 +49,23 @@ CREATE TABLE mts_bars.last_bars (
 ) WITH  CLUSTERING ORDER BY (ddate DESC, ts_end DESC)
 and comment = 'Contains only last bars (ts_end) for each key; ticker_id,bar_width_sec,ddate';
 
+
+
+--new 2
+CREATE TABLE mts_bars.last_bars (
+	ticker_id int,
+	bar_width_sec int,
+	ddate_begin date,
+	ddate_end   date,
+	ts_begin bigint,
+	ts_end bigint,
+	PRIMARY KEY ((ticker_id,bar_width_sec), ddate_begin, ddate_end, ts_begin, ts_end)
+) WITH  CLUSTERING ORDER BY (ddate_begin DESC, ddate_end DESC, ts_begin DESC, ts_end DESC)
+and comment = 'Contains only last bars (ts_end) for each key; ticker_id,bar_width_sec,ddate';
+
+
+
+
 insert into mts_bars.last_bars(ticker_id,bar_width_sec,ddate,ts_end) values(1,300,'2019-02-08',1549662931724);
 insert into mts_bars.last_bars(ticker_id,bar_width_sec,ddate,ts_end) values(1,300,'2019-02-08',1549662931725);
 insert into mts_bars.last_bars(ticker_id,bar_width_sec,ddate,ts_end) values(2,300,'2019-02-19',1550613300701);
