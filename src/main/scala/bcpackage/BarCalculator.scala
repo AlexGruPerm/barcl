@@ -1,12 +1,18 @@
 package bcpackage
 
 import bcstruct.{Bar, CalcProperties, CalcProperty, seqTicksObj}
+import com.datastax.driver.core
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+/*
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+*/
 
 /**
   * The Main class that contains all logic for bar calculation.
@@ -18,7 +24,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
   def logCalcProp(cp :CalcProperty) ={
     logger.debug("Calc property: -------------------------------------------------------------------------------------")
     logger.debug(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" +
-      "  LASTBAR_DDATE=[" + cp.dDateBeginLastBar + "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
+      /*"  LASTBAR_DDATE=[" + cp.dDateBeginLastBar +*/ "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
       cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick)
     logger.debug(" First tick TS = "+cp.tsFirstTicks)
     logger.debug(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
@@ -39,8 +45,8 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
             case _ => cp.beginFrom
           }).min)
 
-      logger.debug(s" In this iteration will read interval (PLAN) $currReadInterval for deepSecs="+cp.barDeepSec)
-      //val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, currReadInterval._1, currReadInterval._2)
+      logger.debug(" In this iteration will read interval (PLAN) FROM: "+ currReadInterval._1+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) +")")
+      logger.debug("                                      (PLAN)   TO: "+ currReadInterval._2+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) +")")
 
       def readTicksRecurs(readFromTs :Long, readToTs :Long) :(seqTicksObj,Long) ={
         val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
@@ -69,38 +75,6 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
           dbInst.saveBars(bars)
       }
 
-      /*
-      if (seqTicks.sqTicks.size==0 && cp.tsLastTick.getOrElse(0L) > currReadInterval._2) {
-        dbInst.saveEmptyBar(cp.tickerId ,cp.barDeepSec, currReadInterval._1, currReadInterval._2)
-      } else {
-        /**
-          * Which interval in seconds was read
-          * */
-        val factReadSeqTicksLnSecs = (seqTicks.sqTicks.last.db_tsunx/1000L - seqTicks.sqTicks.head.db_tsunx/1000L)
-        logger.debug("Ticks data interval in seconds = "+factReadSeqTicksLnSecs+" seconds. Where LastTS = "+seqTicks.sqTicks.last.db_tsunx)
-        if (cp.tsLastTick.getOrElse(0L) > seqTicks.sqTicks.last.db_tsunx &&
-            factReadSeqTicksLnSecs < cp.barDeepSec &&
-            cp.tsLastTick.getOrElse(0L) < currReadInterval._2) {
-            logger.debug(" - tsLastTick inside planning read interval - DO NOTHING, WAIT NEW TICKS -")
-        } else if (cp.tsLastTick.getOrElse(0L) > seqTicks.sqTicks.last.db_tsunx &&
-            factReadSeqTicksLnSecs < cp.barDeepSec &&
-            cp.tsLastTick.getOrElse(0L) > currReadInterval._2) {
-          dbInst.saveEmptyBar(cp.tickerId ,cp.barDeepSec, currReadInterval._1, currReadInterval._2)
-        } else if (cp.tsLastTick.getOrElse(0L) > seqTicks.sqTicks.last.db_tsunx &&
-          factReadSeqTicksLnSecs > cp.barDeepSec &&
-          cp.tsLastTick.getOrElse(0L) > currReadInterval._2){
-            val bars :Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec*1000L)
-            logger.debug(" bars.size="+bars.size)
-          if (bars.size>0)
-            dbInst.saveBars(bars)
-          else
-            dbInst.saveEmptyBar(cp.tickerId ,cp.barDeepSec, currReadInterval._1, currReadInterval._2)
-        }
-      }
-      */
-
-
-
       logger.debug(" ")
       logger.debug("----------------------------------------------------------------------------------------------------")
     }
@@ -120,24 +94,78 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     require(!dbInst.isClosed,s"Session to [$dbType] is closed.")
     logger.debug(s"Session to [$dbType] is opened. Continue.")
 
+
+    /*
+    val t1 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("1-Duration of barCalc.calc() - "+(System.currentTimeMillis - t1) + " msecs.")
+
+    val t2 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("2-Duration of barCalc.calc() - "+(System.currentTimeMillis - t2) + " msecs.")
+
+    val t3 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("3-Duration of barCalc.calc() - "+(System.currentTimeMillis - t3) + " msecs.")
+
+    val t4 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("4-Duration of barCalc.calc() - "+(System.currentTimeMillis - t4) + " msecs.")
+
+    val t5 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("5-Duration of barCalc.calc() - "+(System.currentTimeMillis - t5) + " msecs.")
+
+    val t6 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("6-Duration of barCalc.calc() - "+(System.currentTimeMillis - t6) + " msecs.")
+
+    val t7 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("7-Duration of barCalc.calc() - "+(System.currentTimeMillis - t7) + " msecs.")
+
+    val t8 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("8-Duration of barCalc.calc() - "+(System.currentTimeMillis - t8) + " msecs.")
+
+    val t9 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("9-Duration of barCalc.calc() - "+(System.currentTimeMillis - t9) + " msecs.")
+
+    val t10 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("10-Duration of barCalc.calc() - "+(System.currentTimeMillis - t10) + " msecs.")
+
+    val t11 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("11-Duration of barCalc.calc() - "+(System.currentTimeMillis - t11) + " msecs.")
+
+    val t12 = System.currentTimeMillis
+    calcIteration(dbInst)
+    logger.info("12-Duration of barCalc.calc() - "+(System.currentTimeMillis - t12) + " msecs.")
+*/
+
+
+
     def taskCalcBars(): Future[Unit] = Future {
       val t1 = System.currentTimeMillis
       calcIteration(dbInst)
       val t2 = System.currentTimeMillis
       logger.info("Duration of barCalc.calc() - "+(t2 - t1) + " msecs.")
-      Thread.sleep(3000)
+      Thread.sleep(1500)
     }
-
     def loopCalcBars(): Future[Unit] = {
       taskCalcBars.flatMap(_ => loopCalcBars())
     }
-
     def infiniteLoop(): Future[Unit] = {
       Future.sequence(List(loopCalcBars())).map(_ => ())
     }
-
     Await.ready(infiniteLoop(), Duration.Inf)
 
+
+
+
   }
+
 
 }

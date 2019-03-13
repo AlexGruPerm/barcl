@@ -11,9 +11,9 @@ case class CalcProperty(tickerId      :Int,
                         barDeepSec    :Int,
                         isEnabled     :Int,
                         //-----------------
-                        dDateBeginLastBar  :Option[LocalDate],
-                        tsBeginLastBar     :Option[Long],
-                        dDateEndLastBar    :Option[LocalDate],
+                        //dDateBeginLastBar  :Option[LocalDate],
+                        //tsBeginLastBar     :Option[Long],
+                        //dDateEndLastBar    :Option[LocalDate],
                         tsEndLastBar       :Option[Long],
                         //-----------------
                         dDateLastTick :Option[LocalDate],
@@ -57,9 +57,9 @@ case class CalcProperties(cProps :Seq[CalcProperty]){
 /**
   * Last bar for key: ticker_id, barDeepSec
   */
-case class LastBar(dDateBegin  :LocalDate,
-                   tsBegin     :Long,
-                   dDateEnd    :LocalDate,
+case class LastBar(//dDateBegin  :LocalDate,
+                   //tsBegin     :Long,
+                   //dDateEnd    :LocalDate,
                    tsEnd       :Long)
 
 /**
@@ -94,7 +94,7 @@ class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
   }
 
   val ticker_id       :Int = p_ticker_id
-  val ddate           :Long = barTicks(0).db_tsunx
+  val ddate           :Long =  barTicks.last.db_tsunx// barTicks(0).db_tsunx
   val bar_width_sec   :Int= p_bar_width_sec
   val ts_begin        :Long = barTicks(0).db_tsunx
   val ts_end          :Long = barTicks.last.db_tsunx

@@ -11,7 +11,7 @@ object BarsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
   val node: String = "84.201.147.105"
   val dbType: String = "cassandra"
-  val readBySecs :Long = 60*60*24
+  val readBySecs :Long = 60*60*12 //read by 24 hours.
   try {
     (new BarCalculator(node,dbType,readBySecs)).run
   } catch {
