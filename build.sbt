@@ -24,7 +24,6 @@ assemblyMergeStrategy in assembly := {
 }
 
 assemblyJarName in assembly :="ticksloader.jar"
-//mainClass in assembly := Some("TicksLoader")
 
 mainClass in (Compile, packageBin) := Some("bcapp.TicksLoader")
 mainClass in (Compile, run) := Some("bcapp.TicksLoader")

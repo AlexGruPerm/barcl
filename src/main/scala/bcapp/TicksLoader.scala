@@ -32,7 +32,7 @@ case class  Tick(
 object TicksLoader extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
   val nodeFrom: String = "84.201.147.105" // remote Yandex cloud (sinle instance)
-  val nodeTo: String = "10.241.5.234"     // local 3 instance Cluster.
+  val nodeTo: String = "192.168.122.192"  // local 3 instance Cluster. For cluster:
 
   val sessFrom = Cluster.builder().addContactPoint(nodeFrom).build().connect()
   val ClusterConfigFrom = sessFrom.getCluster.getConfiguration
@@ -51,6 +51,11 @@ object TicksLoader extends App {
   val bndSaveTick = sessTo.prepare(""" insert into mts_src.ticks(ticker_id,ddate,ts,db_tsunx,ask,bid)
                                      	values(:p_ticker_id,:p_ddate,:p_ts,:p_db_tsunx,:p_ask,:p_bid) """).bind()
 
+  val bndSaveTicksByDay = sessTo.prepare(""" update mts_src.ticks_count_days set ticks_count=ticks_count+:p_ticks_count where ticker_id=:p_ticker_id and ddate=:p_ddate """).bind()
+
+  val bndSaveTicksCntTotal = sessTo.prepare("""  update mts_src.ticks_count_total set ticks_count=ticks_count+:p_ticks_count where ticker_id=:p_ticker_id """).bind()
+
+
   val sqTicksCountTotal = sessFrom.execute(bndTicksTotal)
     .all().iterator.asScala.toSeq
     .map(r => TicksCountTotal(r.getInt("ticker_id"),r.getLong("ticks_count")))
@@ -60,10 +65,11 @@ object TicksLoader extends App {
     .all().iterator.asScala.toSeq
     .map(r => TicksCountDays(r.getInt("ticker_id"),r.getDate("ddate"),r.getLong("ticks_count")))
     .sortBy(t => (t.ticker_id,t.ddate.getMillisSinceEpoch)) //sort by ticker_id AND ddate
-    .take(2)
+    //.take(2)
 
   for(elm <- sqTicksCountDays){
-    println(elm +"  TOTAL_TICKS_COUNT = "+sqTicksCountTotal.filter(tct => tct.ticker_id == elm.ticker_id).head.ticks_count)
+    val tickCntTotal = sqTicksCountTotal.filter(tct => tct.ticker_id == elm.ticker_id).head.ticks_count
+    println(elm +"  TOTAL_TICKS_COUNT = "+tickCntTotal)
 
     val sqTicks = sessFrom.execute(bndTicksByTickerDdate
       .setInt("tickerId", elm.ticker_id)
@@ -78,6 +84,7 @@ object TicksLoader extends App {
                                                 )
     ).sortBy(t => t.db_tsunx)
     println(" READ sqTicks.size="+sqTicks.size+" head.db_tsunx="+sqTicks.head.db_tsunx)
+
     for (t <- sqTicks) {
       sessTo.execute(bndSaveTick
         .setInt("p_ticker_id", t.tickerId)
@@ -87,6 +94,16 @@ object TicksLoader extends App {
         .setDouble("p_ask",t.ask)
         .setDouble("p_bid",t.bid))
     }
+
+    sessTo.execute(bndSaveTicksCntTotal
+      .setInt("p_ticker_id", elm.ticker_id)
+      .setLong("p_ticks_count",tickCntTotal))
+
+    sessTo.execute(bndSaveTicksByDay
+      .setInt("p_ticker_id", elm.ticker_id)
+      .setDate("p_ddate", elm.ddate)
+      .setLong("p_ticks_count",elm.ticks_count))
+
     println("   TICKS SAVED INTO Cluster.")
   }
 
