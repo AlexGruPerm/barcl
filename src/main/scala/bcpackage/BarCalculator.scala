@@ -94,59 +94,6 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     require(!dbInst.isClosed,s"Session to [$dbType] is closed.")
     logger.debug(s"Session to [$dbType] is opened. Continue.")
 
-
-    /*
-    val t1 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("1-Duration of barCalc.calc() - "+(System.currentTimeMillis - t1) + " msecs.")
-
-    val t2 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("2-Duration of barCalc.calc() - "+(System.currentTimeMillis - t2) + " msecs.")
-
-    val t3 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("3-Duration of barCalc.calc() - "+(System.currentTimeMillis - t3) + " msecs.")
-
-    val t4 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("4-Duration of barCalc.calc() - "+(System.currentTimeMillis - t4) + " msecs.")
-
-    val t5 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("5-Duration of barCalc.calc() - "+(System.currentTimeMillis - t5) + " msecs.")
-
-    val t6 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("6-Duration of barCalc.calc() - "+(System.currentTimeMillis - t6) + " msecs.")
-
-    val t7 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("7-Duration of barCalc.calc() - "+(System.currentTimeMillis - t7) + " msecs.")
-
-    val t8 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("8-Duration of barCalc.calc() - "+(System.currentTimeMillis - t8) + " msecs.")
-
-    val t9 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("9-Duration of barCalc.calc() - "+(System.currentTimeMillis - t9) + " msecs.")
-
-    val t10 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("10-Duration of barCalc.calc() - "+(System.currentTimeMillis - t10) + " msecs.")
-
-    val t11 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("11-Duration of barCalc.calc() - "+(System.currentTimeMillis - t11) + " msecs.")
-
-    val t12 = System.currentTimeMillis
-    calcIteration(dbInst)
-    logger.info("12-Duration of barCalc.calc() - "+(System.currentTimeMillis - t12) + " msecs.")
-*/
-
-
-
     def taskCalcBars(): Future[Unit] = Future {
       val t1 = System.currentTimeMillis
       calcIteration(dbInst)
