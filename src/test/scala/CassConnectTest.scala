@@ -10,17 +10,17 @@ class CassConnectTest extends FunSuite {
 
 
   test("1. CassConnect.getSession Correct IP") {
-    assert(new DBCass("193.124.112.90","cassandra").getTrySession.isSuccess)
+    assert(new DBCass("10.241.5.234","cassandra").getTrySession.isSuccess)
   }
 
   test("2. CassConnect.getSession Incorrect IP") {
     intercept[NoHostAvailableException] {
-      new DBCass("193.124.112.9", "cassandra").getTrySession
+      new DBCass("10.241.5.23", "cassandra").getTrySession
     }
   }
 
   test("3. QueriesBinds created with closed session should throw IllegalArgumentException") {
-    val dbCassImpl = new DBCass("193.124.112.90","cassandra")
+    val dbCassImpl = new DBCass("10.241.5.234","cassandra")
     val session = dbCassImpl.getTrySession
         session match {
           case Success(ss) => {

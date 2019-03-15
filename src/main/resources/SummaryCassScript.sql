@@ -1,9 +1,8 @@
 ---------------------------------------------------
 --
--- MTS_SRC only 3 tables:
+-- MTS_SRC only 3 tables: Source ticks data.
 --
 ---------------------------------------------------
-
 
 DROP TABLE mts_src.ticks;
 DROP TABLE mts_src.ticks_count_days;
@@ -34,6 +33,27 @@ CREATE TABLE mts_src.ticks_count_total(
 
 ---------------------------------------------------
 --
--- MTS_BARS:
+-- MTS_BARS: Contains calculated bars.
 --
 ---------------------------------------------------
+
+DROP TABLE mts_bars.bars;
+
+CREATE TABLE mts_bars.bars(
+	ticker_id int,
+	ddate date,
+	bar_width_sec int,
+	ts_end bigint,
+	btype text,
+	c double,
+	disp double,
+	h double,
+	h_body double,
+	h_shad double,
+	l double,
+	log_co double,
+	o double,
+	ticks_cnt int,
+	ts_begin bigint,
+	PRIMARY KEY (( ticker_id, ddate, bar_width_sec ), ts_end)
+) WITH CLUSTERING ORDER BY ( ts_end DESC );

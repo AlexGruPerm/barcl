@@ -23,7 +23,7 @@ assemblyMergeStrategy in assembly := {
   case x => MergeStrategy.first
 }
 
-assemblyJarName in assembly :="ticksloader.jar"
+assemblyJarName in assembly :="barcl.jar" // "ticksloader.jar"
 
-mainClass in (Compile, packageBin) := Some("bcapp.TicksLoader")
-mainClass in (Compile, run) := Some("bcapp.TicksLoader")
+mainClass in (Compile, packageBin) := Some("bcapp.BarsCalcApp")  //bcapp.TicksLoader
+mainClass in (Compile, run) := Some("bcapp.BarsCalcApp")
