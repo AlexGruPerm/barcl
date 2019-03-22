@@ -98,7 +98,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       val t1 = System.currentTimeMillis
       calcIteration(dbInst)
       val t2 = System.currentTimeMillis
-      logger.info("Duration of barCalc.calc() - "+(t2 - t1) + " msecs.")
+      logger.info("Duration of barCalc.run() - "+(t2 - t1) + " msecs.")
       Thread.sleep(1500)
     }
     def loopCalcBars(): Future[Unit] = {
