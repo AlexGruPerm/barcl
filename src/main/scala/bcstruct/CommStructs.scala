@@ -11,9 +11,6 @@ case class CalcProperty(tickerId      :Int,
                         barDeepSec    :Int,
                         isEnabled     :Int,
                         //-----------------
-                        //dDateBeginLastBar  :Option[LocalDate],
-                        //tsBeginLastBar     :Option[Long],
-                        //dDateEndLastBar    :Option[LocalDate],
                         tsEndLastBar       :Option[Long],
                         //-----------------
                         dDateLastTick :Option[LocalDate],
@@ -125,3 +122,40 @@ class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
     "[ "+ts_begin+":"+ts_end+"] ohlc=["+o+","+h+","+l+","+c+"] "+btype+"   body,shad=["+h_body+","+h_shad+"]"
 
 }
+
+case class barsMeta(
+                     tickerId    :Int,
+                     barWidthSec :Int,
+                     dDate       :LocalDate
+                   )
+
+case class barsForFutAnalyze(
+                              tickerId    :Int,
+                              barWidthSec :Int,
+                              dDate       :LocalDate,
+                              ts_begin    :Long,
+                              ts_end      :Long,
+                              o           :Double,
+                              h           :Double,
+                              l           :Double,
+                              c           :Double
+                            ){
+  val minOHLC = Seq(o,h,l,c).min
+  val maxOHLC = Seq(o,h,l,c).max
+}
+
+/**
+  * Seq(
+  * ("prcnt_5",{res, ts_exit, ..., ... }),
+  * ("prcnt_10",{})
+  * )
+*/
+case class barsFutAnalyzeRes(
+                             srcBar   : barsForFutAnalyze,
+                             resAnal  : Seq[(String,Map[String,String])]
+                            )
+
+case class barsFutAnalyzeOneSearchRes(
+                              srcBar   : barsForFutAnalyze,
+                              resAnal  : (String,Map[String,String])
+                            )

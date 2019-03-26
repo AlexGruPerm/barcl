@@ -7,6 +7,7 @@ libraryDependencies ++= Seq(
   "com.datastax.cassandra" % "cassandra-driver-core" % "3.6.0",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scala-lang" % "scala-library" % "2.11.8",
+  "com.madhukaraphatak" %% "java-sizeof" % "0.1",
   "org.scalatest" %% "scalatest" % "3.0.5" % Test
 )
 
