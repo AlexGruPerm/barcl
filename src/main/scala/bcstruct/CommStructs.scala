@@ -152,10 +152,6 @@ case class barsForFutAnalyze(
 */
 case class barsFutAnalyzeRes(
                              srcBar   : barsForFutAnalyze,
-                             resAnal  : Seq[(String,Map[String,String])]
+                             resAnal  : Option[barsForFutAnalyze]
                             )
 
-case class barsFutAnalyzeOneSearchRes(
-                              srcBar   : barsForFutAnalyze,
-                              resAnal  : (String,Map[String,String])
-                            )

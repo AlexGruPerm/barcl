@@ -1,6 +1,6 @@
 package bcpackage
 
-import bcstruct.{barsForFutAnalyze, barsFutAnalyzeOneSearchRes, barsMeta}
+import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta}
 import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
@@ -20,8 +20,19 @@ class BarRangeCalculator(nodeAddress :String, seqPrcnts: Seq[Int]) {
 
        // val futAnalRes :Seq[Seq[barsFutAnalyzeOneSearchRes]] = for (p<-seqPrcnts) yield dbInst.makeAnalyze(allBars,p)
 
-        val futAnalRes :Seq[barsFutAnalyzeOneSearchRes] = dbInst.makeAnalyze(allBars,5)
-        logger.debug("After research seq of RES = "+futAnalRes.size+" xxx=")
+        val futAnalRes :Seq[barsFutAnalyzeRes] = dbInst.makeAnalyze(allBars,0.438/*0.873*/)
+        logger.debug("After research seq of RES = "+futAnalRes.size)
+
+        logger.debug("=======================================================")
+
+
+        for(b <- futAnalRes) {
+          logger.debug("("+b.srcBar.ts_end+" - "+b.srcBar.c+")"+"  -  "+b.resAnal)
+        }
+
+
+        //logger.debug("curr Example = "+futAnalRes.toSeq.filter(b => b.srcBar.ts_end == 1550477310535L).map(e => e.srcBar).head)
+        logger.debug("=======================================================")
 
     }
   }

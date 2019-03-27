@@ -1,5 +1,17 @@
 
+var l = List(11,2202,32,443,534)
 
+for (
+  b <-l ;
+  idx = l.indexOf(b);
+  s = l.drop(idx+1)
+){
+  println(b+" - "+s)
+}
+
+
+
+/*
 val l :Seq[Int] = Seq(1,2,3,4,5,6,7,8,9,10)
 
 val sl = l.grouped(3)
@@ -7,6 +19,7 @@ val sl = l.grouped(3)
 for (s <- sl){
   println(s)
 }
+*/
 
 /*
 val keys = List(2, 5, 1)

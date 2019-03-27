@@ -27,7 +27,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def saveBars(seqBarsCalced :Seq[Bar])
   def getAllBarsHistMeta : Seq[barsMeta]
   def getAllCalcedBars(seqB :Seq[barsMeta]) : Seq[barsForFutAnalyze]
-  def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Int) : Seq[barsFutAnalyzeOneSearchRes]
+  def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) : Seq[barsFutAnalyzeRes]
 
 }
 
@@ -406,7 +406,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
-   session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r)).filter(r =>  r.tickerId==1 && r.barWidthSec==30) //-----------------~~~~~~!!!!!!!!!!!!!!!!!!!!!!!!!!
+   session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r)).filter(r =>  r.tickerId==1 && r.barWidthSec==/*30*/3600) //-----------------~~~~~~!!!!!!!!!!!!!!!!!!!!!!!!!!
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
   }
 
@@ -431,57 +431,105 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *  Calculate for each bar and for each seqPrcnts (typical values : 5,10,15 percents).
     *
   */
-  def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Int) : Seq[barsFutAnalyzeOneSearchRes] = {
+  def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) : Seq[barsFutAnalyzeRes] = {
+
+    val pUp = 1 + p / 100
+    val pDw = 1 - p / 100
 
    def fCheckCritMax (currBar :barsForFutAnalyze,  srcElm:barsForFutAnalyze) :Boolean =
-     currBar.c * (1 + p / 100) >= srcElm.minOHLC && currBar.c <= srcElm.maxOHLC
+     currBar.c * pUp >= srcElm.minOHLC && currBar.c * pUp <= srcElm.maxOHLC
 
     def fCheckCritMin (currBar :barsForFutAnalyze,  srcElm:barsForFutAnalyze) :Boolean =
-      currBar.c * (1 - p / 100) >= srcElm.minOHLC && currBar.c <= srcElm.maxOHLC
+      currBar.c * pDw >= srcElm.minOHLC && currBar.c * pDw <= srcElm.maxOHLC
 
     def fCheckCritBoth (currBar :barsForFutAnalyze,  srcElm:barsForFutAnalyze) :Boolean =
-      currBar.c * (1 + p / 100) <= srcElm.maxOHLC && currBar.c * (1 - p / 100) >= srcElm.minOHLC
+      currBar.c * pUp <= srcElm.maxOHLC && currBar.c * pDw >= srcElm.minOHLC
 
 
-  val r = for (currBar <- seqB) yield {
+  val r = for (
+    currBar <- seqB;
+    //searchSeq = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
+    // OR
+    idxDrop = seqB.indexOf(currBar);
+    searchSeq = seqB.drop(idxDrop+1)
+  ) yield {
 
-    val fbMax :Long = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
+    val fbMax :Long = searchSeq
       .find(srcElm => fCheckCritMax(currBar,srcElm)).headOption
     match {
       case Some(foundedBar) => foundedBar.ts_end
       case None => 0L
     }
 
-    val fbMin :Long = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
+    val fbMin :Long =
+      (fbMax match {
+        case 0L =>
+          searchSeq
+            .find(srcElm => fCheckCritMin(currBar,srcElm)).headOption
+        case x:Long =>
+          searchSeq.filter(srcElm => (srcElm.ts_end > currBar.ts_end && srcElm.ts_end < x))
+            .find(srcElm => fCheckCritMin(currBar,srcElm)).headOption
+      })
+      match {
+        case Some(foundedBar) => foundedBar.ts_end
+        case None => 0L
+      }
+
+    val fbBoth :Long =
+      ((fbMin,fbMax) match {
+        case (0L, 0L)             => searchSeq
+          .find(srcElm => fCheckCritBoth(currBar,srcElm)).headOption
+        case (mn :Long, 0L)       =>searchSeq
+          .find(srcElm => fCheckCritBoth(currBar,srcElm)).headOption
+        case (0L, mx :Long)       =>searchSeq
+          .find(srcElm => fCheckCritBoth(currBar,srcElm)).headOption
+        case (mn :Long, mx :Long) =>searchSeq
+          .find(srcElm => fCheckCritBoth(currBar,srcElm)).headOption
+      })
+      match {
+        case Some(foundedBar) => foundedBar.ts_end
+        case None => 0L
+    }
+
+
+
+
+    /*
+    val fbMin :Long = seqB.filter(srcElm => ( (srcElm.ts_end > currBar.ts_end) && (fbMax==0L || (fbMax!=0L && srcElm.ts_end < fbMax)) ))
       .find(srcElm => fCheckCritMin(currBar,srcElm)).headOption
     match {
       case Some(foundedBar) => foundedBar.ts_end
       case None => 0L
     }
+*/
 
-    val fbBoth :Long = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
+    /*
+    val fbBoth :Long = seqB.filter(srcElm => ((srcElm.ts_end > currBar.ts_end) && fbMax==0L && fbMin==0L))
       .find(srcElm => fCheckCritBoth(currBar,srcElm)).headOption
     match {
       case Some(foundedBar) => foundedBar.ts_end
       case None => 0L
     }
+    */
 
-    val aFounded :Seq[(String,Long)] = Seq(("mx",fbMax),("mn",fbMin),("bt",fbBoth))
+    val aFoundedAll :Seq[(String,Long)] = Seq(("mx",fbMax),("mn",fbMin),("bt",fbBoth)).filter(e => e._2!=0L)
+    val aFounded :Option[(String,Long)] = aFoundedAll.find(e => e._2 == aFoundedAll.map(elm => elm._2).min).headOption
 
-    if (aFounded.exists(ts => ts._2 != 0L)) {
-     val tsEndMin : (String,Long) = aFounded.find(e => e._2 == aFounded.map(elm => elm._2).min).head
-      new barsFutAnalyzeOneSearchRes(
-        currBar,
-        (tsEndMin._1,Map("name"->"value"))
-      )
-    } else {
-      new barsFutAnalyzeOneSearchRes(
-        currBar,
-        ("nn",Map("name"->"value"))
-      )
+    aFounded match {
+      case Some(bar) =>
+        new barsFutAnalyzeRes(
+          currBar,
+          searchSeq/*.filter(srcElm => srcElm.ts_end > currBar.ts_end)*/.find(b => b.ts_end == bar._2)
+        )
+      case None =>
+        new barsFutAnalyzeRes(
+          currBar,
+          None
+        )
     }
-
   }
+
+
 
     r
   }
