@@ -25,7 +25,6 @@ object BarsCalcApp extends App {
   } catch {
     case ex: Throwable => ex.printStackTrace()
   }
-
 }
 
 

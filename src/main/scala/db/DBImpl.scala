@@ -412,13 +412,15 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
-   session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r)).filter(r =>  r.tickerId==1 && r.barWidthSec==30)
+   session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
+     .filter(r =>  r.tickerId==1 && r.barWidthSec==30)
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec
   }
 
   /**
     * Read all bars from mts_bars.bars by input filtered seqB (contains same tickerID, bar_width_sec and differnet ddates)
+    * Read date by date for key: ticker+bws
     *
     * */
   def getAllCalcedBars(seqB :Seq[barsMeta]) : Seq[barsForFutAnalyze] = {
@@ -533,7 +535,6 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
        )
     }
 
-    //maybe 200 ???
     val partsSeqBarFa = preparedSeq.grouped(100)//other limit 65535 for tiny rows.
 
     for(thisPartOfSeq <- partsSeqBarFa) {

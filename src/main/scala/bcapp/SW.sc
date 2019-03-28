@@ -1,7 +1,7 @@
 
-val l = List(1,2,3,4,5,6,7,8,9)
+val l = List(1,2,3,4,5,6,7,8,9,10)
 
-l.sliding(3,3).toList
+l.sliding(3,3).toList.filter(sc => sc.size==3).flatten
 
 
 /*

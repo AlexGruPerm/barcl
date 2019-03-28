@@ -13,21 +13,34 @@ class BarRangeCalculator(nodeAddress :String, seqPrcnts: Seq[Int]) {
     val allBarsHistMeta :Seq[barsMeta] = dbInst.getAllBarsHistMeta
     allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.foreach {
       bhm =>
-        val allBars: Seq[barsForFutAnalyze] = dbInst.getAllCalcedBars(allBarsHistMeta.filter(r => r.tickerId==bhm._1 && r.barWidthSec==bhm._2))
+        val allBars: Seq[barsForFutAnalyze] = dbInst.getAllCalcedBars(allBarsHistMeta.filter(r => r.tickerId == bhm._1 && r.barWidthSec == bhm._2))
         logger.debug("allBars BY ["+bhm._1+","+bhm._2+"] SIZE = " + allBars.size+"  ("+allBars.head.ts_end+" - "+allBars.last.ts_end+") "+
                                                                " (" + allBars.head.dDate+" - "+allBars.last.dDate+") SIZE="+SizeEstimator.estimate(dbInst)+" bytes.")
 
         val prcntsDiv = Seq(0.219,0.437,0.873)
+        val prcntsDivSize = prcntsDiv.size
         val t1FAnal = System.currentTimeMillis
         val futAnalRes :Seq[barsFutAnalyzeRes] = prcntsDiv.flatMap(p => dbInst.makeAnalyze(allBars,p))
         val t2FAnal = System.currentTimeMillis
         logger.debug("After analyze RES.size = "+futAnalRes.size+" Duration "+(t2FAnal-t1FAnal)+" msecs.")
 
-          val t1FS = System.currentTimeMillis
-          val resFSave :Seq[barsResToSaveDB] = futAnalRes.map(b => b.srcBar.ts_end).distinct.map(
-            thisTsEnd => new barsResToSaveDB(futAnalRes.filter(ab => ab.srcBar.ts_end == thisTsEnd)))
-          val t2FS = System.currentTimeMillis
-         logger.info("Duration of gathering resFSave - "+(t2FS - t1FS) + " msecs.")
+        /**
+          *
+          *  !!!
+          *  .sliding(prcntsDivSize, prcntsDivSize) made fore performance optimization, old code:
+          *
+          *   val resFSave :Seq[barsResToSaveDB] = futAnalRes.map(b => b.srcBar.ts_end).distinct.map(
+          *      thisTsEnd => new barsResToSaveDB(futAnalRes.filter(ab => ab.srcBar.ts_end == thisTsEnd)))
+          *
+          *   Here difficult distinct operation and and filter for grouping rows by "ab.srcBar.ts_end"
+          *
+        */
+        val t1FS = System.currentTimeMillis
+        val resFSave :Seq[barsResToSaveDB] = futAnalRes.sortBy(t => t.srcBar.ts_end).sliding(prcntsDivSize, prcntsDivSize)
+          .filter(elm => elm.size == prcntsDivSize)
+          .map(intList => new barsResToSaveDB(intList)).to[collection.immutable.Seq]
+        val t2FS = System.currentTimeMillis
+        logger.info("Duration of gathering resFSave - "+(t2FS - t1FS) + " msecs.")
 
         /*
       logger.debug("=======================================================")
@@ -39,12 +52,15 @@ class BarRangeCalculator(nodeAddress :String, seqPrcnts: Seq[Int]) {
         logger.debug("      ")
       }
       logger.debug("=======================================================")
-       */
+*/
+
+
         val t1Save = System.currentTimeMillis
         dbInst.saveBarsFutAnal(resFSave)
         val t2Save = System.currentTimeMillis
         logger.info("Duration of saveing into mts_bars.bars_fa - "+(t2Save - t1Save) + " msecs.")
         //logger.debug("==========================================================")
+
     }
   }
 

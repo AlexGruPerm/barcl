@@ -126,7 +126,7 @@ class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
 case class barsMeta(
                      tickerId    :Int,
                      barWidthSec :Int,
-                     dDate       :LocalDate,
+                     dDate       :LocalDate, //remove this filed, not necessary
                      lastTsEnd   :Long
                    )
 
@@ -170,14 +170,13 @@ case class barsFutAnalyzeRes(
   * -----
 */
 
-
 class barsResToSaveDB(seqBRes :Seq[barsFutAnalyzeRes]) {
   val currB : barsForFutAnalyze = seqBRes.head.srcBar
   val futBarsRes :Seq[(Double,Map[String,String])] = seqBRes.map(sb =>
     (sb.p,Map(
               "res"    -> sb.resType,
               "ts_end" -> (sb.resAnal match {case Some(r) => r.ts_end.toString case None => ""}),
-              "ddate"  -> (sb.resAnal match {case Some(r) => r.dDate.toString case None => ""}),
+             // "ddate"  -> (sb.resAnal match {case Some(r) => r.dDate.toString case None => ""}),
               "durSec" -> (sb.resAnal match {case Some(r) => Math.round(( (r.ts_end + r.ts_begin)/2L -sb.srcBar.ts_end)/1000L).toString case None => "0"})
              )
     )
