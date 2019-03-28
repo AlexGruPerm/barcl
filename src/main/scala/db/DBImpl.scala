@@ -1,9 +1,9 @@
 package db
 
-import bcstruct.{barsForFutAnalyze, barsMeta, _}
+import bcstruct.{barsForFutAnalyze, barsMeta, barsResToSaveDB, _}
 import com.datastax.driver.core
 import com.datastax.driver.core.exceptions.NoHostAvailableException
-import com.datastax.driver.core.{Cluster, LocalDate, Row, Session}
+import com.datastax.driver.core._
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -28,6 +28,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllBarsHistMeta : Seq[barsMeta]
   def getAllCalcedBars(seqB :Seq[barsMeta]) : Seq[barsForFutAnalyze]
   def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) : Seq[barsFutAnalyzeRes]
+  def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB])
 
 }
 
@@ -181,6 +182,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
          order by ts_end
          allow filtering; """).bind()
 
+  val bndSaveFa =session.prepare(
+    """ insert into mts_bars.bars_fa(ticker_id, bar_width_sec, ddate, ts_end, res_0_219, res_0_437, res_0_873)
+                              values(:p_ticker_id, :p_bar_width_sec, :p_ddate, :p_ts_end, :p_res_0_219, :p_res_0_437, :p_res_0_873) """)//.bind()
+
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
     *
@@ -296,7 +301,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     new barsMeta(
       row.getInt("ticker_id"),
       row.getInt("bar_width_sec"),
-      row.getDate("ddate")
+      row.getDate("ddate"),
+      0L
     )
   }
 
@@ -406,8 +412,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
-   session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r)).filter(r =>  r.tickerId==1 && r.barWidthSec==/*30*/3600) //-----------------~~~~~~!!!!!!!!!!!!!!!!!!!!!!!!!!
+   session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r)).filter(r =>  r.tickerId==1 && r.barWidthSec==30)
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
+    //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec
   }
 
   /**
@@ -431,7 +438,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *  Calculate for each bar and for each seqPrcnts (typical values : 5,10,15 percents).
     *
   */
-  def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) : Seq[barsFutAnalyzeRes] = {
+  def makeAnalyze(seqB :Seq[barsForFutAnalyze], p: Double) : Seq[barsFutAnalyzeRes] = {
 
     val pUp = 1 + p / 100
     val pDw = 1 - p / 100
@@ -448,8 +455,11 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   val r = for (
     currBar <- seqB;
-    //searchSeq = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
-    // OR
+    /**
+      Optimization: drop is faster
+    searchSeq = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
+     OR
+    */
     idxDrop = seqB.indexOf(currBar);
     searchSeq = seqB.drop(idxDrop+1)
   ) yield {
@@ -491,48 +501,61 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         case None => 0L
     }
 
-
-
-
-    /*
-    val fbMin :Long = seqB.filter(srcElm => ( (srcElm.ts_end > currBar.ts_end) && (fbMax==0L || (fbMax!=0L && srcElm.ts_end < fbMax)) ))
-      .find(srcElm => fCheckCritMin(currBar,srcElm)).headOption
-    match {
-      case Some(foundedBar) => foundedBar.ts_end
-      case None => 0L
-    }
-*/
-
-    /*
-    val fbBoth :Long = seqB.filter(srcElm => ((srcElm.ts_end > currBar.ts_end) && fbMax==0L && fbMin==0L))
-      .find(srcElm => fCheckCritBoth(currBar,srcElm)).headOption
-    match {
-      case Some(foundedBar) => foundedBar.ts_end
-      case None => 0L
-    }
-    */
-
     val aFoundedAll :Seq[(String,Long)] = Seq(("mx",fbMax),("mn",fbMin),("bt",fbBoth)).filter(e => e._2!=0L)
     val aFounded :Option[(String,Long)] = aFoundedAll.find(e => e._2 == aFoundedAll.map(elm => elm._2).min).headOption
 
     aFounded match {
       case Some(bar) =>
         new barsFutAnalyzeRes(
-          currBar,
-          searchSeq/*.filter(srcElm => srcElm.ts_end > currBar.ts_end)*/.find(b => b.ts_end == bar._2)
+          currBar, searchSeq.find(b => b.ts_end == bar._2),
+          p, bar._1
         )
       case None =>
         new barsFutAnalyzeRes(
-          currBar,
-          None
+          currBar, None, p , "nn"
         )
     }
   }
-
-
-
     r
   }
+
+
+  /**
+    * Save results of Future analyze into DB mts_bars.bars_fa
+    */
+  def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB]) = {
+    val preparedSeq = for(b <- seqFA) yield {
+      // _1-bar  _2,_3,_4-Maps
+       (b.currB,
+        b.futBarsRes.find(b => b._1 == 0.219),
+        b.futBarsRes.find(b => b._1 == 0.437),
+        b.futBarsRes.find(b => b._1 == 0.873)
+       )
+    }
+
+    //maybe 200 ???
+    val partsSeqBarFa = preparedSeq.grouped(100)//other limit 65535 for tiny rows.
+
+    for(thisPartOfSeq <- partsSeqBarFa) {
+      //logger.debug("INSIDE [saveBarsFutAnal] SIZE OF thisPartOfSeq = "+thisPartOfSeq.size)
+      var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
+      thisPartOfSeq.foreach {
+        t =>
+          batch.add(bndSaveFa.bind()
+            .setInt("p_ticker_id", t._1.tickerId)
+            .setInt("p_bar_width_sec",t._1.barWidthSec)
+            .setDate("p_ddate", t._1.dDate)
+            .setLong("p_ts_end", t._1.ts_end)
+            .setMap("p_res_0_219", t._2 match {case Some(m) => m._2.asJava case None => Map("res" -> "nn").asJava})
+            .setMap("p_res_0_437", t._3 match {case Some(m) => m._2.asJava case None => Map("res" -> "nn").asJava})
+            .setMap("p_res_0_873", t._4 match {case Some(m) => m._2.asJava case None => Map("res" -> "nn").asJava})
+          )
+      }
+      session.execute(batch)
+    }
+
+  }
+  /** ------------------------------------------------------- */
 
 }
 
@@ -542,3 +565,4 @@ object DBCass {
     new DBCass(nodeAddress,dbType)
   }
 }
+

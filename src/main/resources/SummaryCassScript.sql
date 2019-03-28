@@ -112,9 +112,19 @@ INSERT INTO mts_meta.tickers (ticker_id,ticker_code,ticker_first,ticker_seconds)
 
 ---------------------------------------------------
 --
---
+--Results of future analyze for each bar from mts_bars.bars
 --
 ---------------------------------------------------
+CREATE TABLE mts_bars.bars_fa(
+	ticker_id int,
+	bar_width_sec int,
+	ddate date,
+	ts_end bigint,
+    res_0_219 map<text,text>,
+    res_0_437 map<text,text>,
+    res_0_873 map<text,text>,
+	PRIMARY KEY ((ticker_id, ddate, bar_width_sec),ts_end)
+) WITH  CLUSTERING ORDER BY (ts_end DESC);
 
 
 ---------------------------------------------------

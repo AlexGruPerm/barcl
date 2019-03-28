@@ -1,6 +1,6 @@
 package bcpackage
 
-import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta}
+import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta, barsResToSaveDB}
 import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
@@ -17,23 +17,34 @@ class BarRangeCalculator(nodeAddress :String, seqPrcnts: Seq[Int]) {
         logger.debug("allBars BY ["+bhm._1+","+bhm._2+"] SIZE = " + allBars.size+"  ("+allBars.head.ts_end+" - "+allBars.last.ts_end+") "+
                                                                " (" + allBars.head.dDate+" - "+allBars.last.dDate+") SIZE="+SizeEstimator.estimate(dbInst)+" bytes.")
 
+        val prcntsDiv = Seq(0.219,0.437,0.873)
+        val t1FAnal = System.currentTimeMillis
+        val futAnalRes :Seq[barsFutAnalyzeRes] = prcntsDiv.flatMap(p => dbInst.makeAnalyze(allBars,p))
+        val t2FAnal = System.currentTimeMillis
+        logger.debug("After analyze RES.size = "+futAnalRes.size+" Duration "+(t2FAnal-t1FAnal)+" msecs.")
 
-       // val futAnalRes :Seq[Seq[barsFutAnalyzeOneSearchRes]] = for (p<-seqPrcnts) yield dbInst.makeAnalyze(allBars,p)
+          val t1FS = System.currentTimeMillis
+          val resFSave :Seq[barsResToSaveDB] = futAnalRes.map(b => b.srcBar.ts_end).distinct.map(
+            thisTsEnd => new barsResToSaveDB(futAnalRes.filter(ab => ab.srcBar.ts_end == thisTsEnd)))
+          val t2FS = System.currentTimeMillis
+         logger.info("Duration of gathering resFSave - "+(t2FS - t1FS) + " msecs.")
 
-        val futAnalRes :Seq[barsFutAnalyzeRes] = dbInst.makeAnalyze(allBars,0.438/*0.873*/)
-        logger.debug("After research seq of RES = "+futAnalRes.size)
-
-        logger.debug("=======================================================")
-
-
-        for(b <- futAnalRes) {
-          logger.debug("("+b.srcBar.ts_end+" - "+b.srcBar.c+")"+"  -  "+b.resAnal)
-        }
-
-
-        //logger.debug("curr Example = "+futAnalRes.toSeq.filter(b => b.srcBar.ts_end == 1550477310535L).map(e => e.srcBar).head)
-        logger.debug("=======================================================")
-
+        /*
+      logger.debug("=======================================================")
+      for(sr <- resFSave) {
+        logger.debug(sr.currB.toString)
+         for(r <- sr.futBarsRes){
+           logger.debug("   "+r.toString())
+         }
+        logger.debug("      ")
+      }
+      logger.debug("=======================================================")
+       */
+        val t1Save = System.currentTimeMillis
+        dbInst.saveBarsFutAnal(resFSave)
+        val t2Save = System.currentTimeMillis
+        logger.info("Duration of saveing into mts_bars.bars_fa - "+(t2Save - t1Save) + " msecs.")
+        //logger.debug("==========================================================")
     }
   }
 
@@ -43,6 +54,10 @@ class BarRangeCalculator(nodeAddress :String, seqPrcnts: Seq[Int]) {
       * dbSess hides DB query execution logic and converting data sets into seq of scala objects.
       * Lets us get necessary structures of data.
       */
+      /**
+        * Add read last analyzed bar, don't recalc all.
+        *
+        * */
     val dbInst: DBImpl = new DBCass(nodeAddress, "cassandra")
     val t1 = System.currentTimeMillis
      calcIteration(dbInst)

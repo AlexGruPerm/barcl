@@ -126,7 +126,8 @@ class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
 case class barsMeta(
                      tickerId    :Int,
                      barWidthSec :Int,
-                     dDate       :LocalDate
+                     dDate       :LocalDate,
+                     lastTsEnd   :Long
                    )
 
 case class barsForFutAnalyze(
@@ -149,9 +150,39 @@ case class barsForFutAnalyze(
   * ("prcnt_5",{res, ts_exit, ..., ... }),
   * ("prcnt_10",{})
   * )
+  * //resType mn - Down, mx - Up, bt- Both, nn- Not found.
 */
 case class barsFutAnalyzeRes(
                              srcBar   : barsForFutAnalyze,
-                             resAnal  : Option[barsForFutAnalyze]
+                             resAnal  : Option[barsForFutAnalyze],
+                             p        : Double,
+                             resType  : String
                             )
+
+/**
+  * Take on input seq only for same ts_end
+  * -----
+  * (1549268939406 - 1.14457)  -  Some(barsForFutAnalyze(1,3600,2019-02-06,1549430920383,1549434507567,1.14005,1.14012,1.13922,1.13943)) p=0.438
+  * (1549268939406 - 1.14457)  -  Some(barsForFutAnalyze(1,3600,2019-02-07,1549528110345,1549531709700,1.13498,1.13571,1.13439,1.13453)) p=0.873
+  * -----
+  * (1549272539680 - 1.14452)  -  Some(barsForFutAnalyze(1,3600,2019-02-06,1549430920383,1549434507567,1.14005,1.14012,1.13922,1.13943)) p=0.438
+  * (1549272539680 - 1.14452)  -  Some(barsForFutAnalyze(1,3600,2019-02-07,1549528110345,1549531709700,1.13498,1.13571,1.13439,1.13453)) p=0.873
+  * -----
+*/
+
+
+class barsResToSaveDB(seqBRes :Seq[barsFutAnalyzeRes]) {
+  val currB : barsForFutAnalyze = seqBRes.head.srcBar
+  val futBarsRes :Seq[(Double,Map[String,String])] = seqBRes.map(sb =>
+    (sb.p,Map(
+              "res"    -> sb.resType,
+              "ts_end" -> (sb.resAnal match {case Some(r) => r.ts_end.toString case None => ""}),
+              "ddate"  -> (sb.resAnal match {case Some(r) => r.dDate.toString case None => ""}),
+              "durSec" -> (sb.resAnal match {case Some(r) => Math.round(( (r.ts_end + r.ts_begin)/2L -sb.srcBar.ts_end)/1000L).toString case None => "0"})
+             )
+    )
+  )
+  }
+
+
 

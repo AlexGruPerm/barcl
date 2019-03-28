@@ -1,14 +1,7 @@
 
-var l = List(11,2202,32,443,534)
+val l = List(1,2,3,4,5,6,7,8,9)
 
-for (
-  b <-l ;
-  idx = l.indexOf(b);
-  s = l.drop(idx+1)
-){
-  println(b+" - "+s)
-}
-
+l.sliding(3,3).toList
 
 
 /*
