@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 
 object FormsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
-  val node: String = "192.168.122.192"
+  val node: String = "10.241.5.234"
   val dbType: String = "cassandra"
   val readBySecs: Long = 60 * 60 * 12
   try {

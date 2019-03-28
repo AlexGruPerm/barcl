@@ -126,7 +126,7 @@ class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
 case class barsMeta(
                      tickerId    :Int,
                      barWidthSec :Int,
-                     dDate       :LocalDate, //remove this filed, not necessary
+                     dDate       :LocalDate,
                      lastTsEnd   :Long
                    )
 
@@ -182,6 +182,14 @@ class barsResToSaveDB(seqBRes :Seq[barsFutAnalyzeRes]) {
     )
   )
   }
+
+
+case class barsFaMeta(
+                     tickerId    :Int,
+                     barWidthSec :Int,
+                     dDate       :LocalDate,
+                     lastTsEnd   :Long
+                   )
 
 
 

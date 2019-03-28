@@ -29,6 +29,9 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllCalcedBars(seqB :Seq[barsMeta]) : Seq[barsForFutAnalyze]
   def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) : Seq[barsFutAnalyzeRes]
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB])
+  // For FormsBuilder
+  def getAllBarsFAMeta : Seq[barsFaMeta]
+
 
 }
 
@@ -186,6 +189,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     """ insert into mts_bars.bars_fa(ticker_id, bar_width_sec, ddate, ts_end, res_0_219, res_0_437, res_0_873)
                               values(:p_ticker_id, :p_bar_width_sec, :p_ddate, :p_ts_end, :p_res_0_219, :p_res_0_437, :p_res_0_873) """)//.bind()
 
+  val bndBarsFAMeta = session.prepare(
+    """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """).bind()
+
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
     *
@@ -320,6 +326,15 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     )
   }
 
+  val rowToBarFAMeta = (row :Row) => {
+    new barsFaMeta(
+      row.getInt("ticker_id"),
+      row.getInt("bar_width_sec"),
+      row.getDate("ddate"),
+      0L
+    )
+  }
+
   /**
     * Read and return seq of ticks for this ticker_id and interval by ts: tsBegin - tsEnd (unix timestamp)
   */
@@ -413,9 +428,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
    session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-     .filter(r =>  r.tickerId==1 && r.barWidthSec==30)
+     .filter(r =>  r.tickerId==1 && r.barWidthSec==30)//-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
-    //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec
+    //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
 
   /**
@@ -557,6 +572,18 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   }
   /** ------------------------------------------------------- */
+
+
+
+  def getAllBarsFAMeta : Seq[barsFaMeta] ={
+    session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
+      .filter(r =>  r.tickerId==1 && r.barWidthSec==30) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
+    //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
+  }
+
+
+
 
 }
 

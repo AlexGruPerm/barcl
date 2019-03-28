@@ -7,6 +7,7 @@ class FormsBuilder(nodeAddress :String) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   def calcIteration(dbInst :DBImpl) = {
+   logger.debug("Begin FormsBuilder.calcIteration")
 
   }
 
