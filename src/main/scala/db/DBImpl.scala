@@ -31,7 +31,8 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB])
   // For FormsBuilder
   def getAllBarsFAMeta : Seq[barsFaMeta]
-
+  def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData]
+  def filterFABars(seqB :Seq[barsFaData], groupIntervalSec :Int) : Seq[(Int,barsFaData)]
 
 }
 
@@ -192,6 +193,18 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   val bndBarsFAMeta = session.prepare(
     """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """).bind()
 
+  val bndBarsFaData = session.prepare(
+    """ select
+ 	                    ts_end,
+ 	                    res_0_219,
+ 	                    res_0_437,
+ 	                    res_0_873
+                 from mts_bars.bars_fa
+                where ticker_id     = :p_ticker_id and
+                      bar_width_sec = :p_bar_width_sec and
+                      ddate         = :p_ddate
+                allow filtering; """).bind()
+
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
     *
@@ -335,6 +348,21 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     )
   }
 
+  val rowToBarFAData = (row :Row, tickerID :Int, barWidthSec :Int, dDate :LocalDate) => {
+    val map_res_0_219 = row.getMap("res_0_219", classOf[String], classOf[String]).asScala.toMap
+    val map_res_0_437 = row.getMap("res_0_437", classOf[String], classOf[String]).asScala.toMap
+    val map_res_0_873 = row.getMap("res_0_873", classOf[String], classOf[String]).asScala.toMap
+    new barsFaData(
+      tickerID,
+      barWidthSec,
+      dDate,
+      row.getLong("ts_end"),
+      (map_res_0_219.get("res").getOrElse("nn"), map_res_0_219),
+      (map_res_0_437.get("res").getOrElse("nn"), map_res_0_437),
+      (map_res_0_873.get("res").getOrElse("nn"), map_res_0_873)
+    )
+  }
+
   /**
     * Read and return seq of ticks for this ticker_id and interval by ts: tsBegin - tsEnd (unix timestamp)
   */
@@ -428,7 +456,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
    session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-     .filter(r =>  r.tickerId==1 && r.barWidthSec==30)//-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+     .filter(r =>  r.tickerId==1 && r.barWidthSec==3600)//-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -577,12 +605,60 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      .filter(r =>  r.tickerId==1 && r.barWidthSec==30) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+      .filter(r =>  r.tickerId==1 && r.barWidthSec==3600) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
 
+  /**
+    *
+    * Read all data for each ddata by key: ticker_id and bws
+    *
+  */
+  def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData] = {
+    seqB.flatMap(sb => session.execute(bndBarsFaData
+      .setInt("p_ticker_id", sb.tickerId)
+      .setInt("p_bar_width_sec",sb.barWidthSec)
+      .setDate("p_ddate",sb.dDate))
+      .all()
+      .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+      .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd))
+    )
+  }
 
+  /**
+    * Filter source seq of FABars and group it groups with group number,
+    * step between groups is related by groupIntervalSec (seconds)
+    * Do it in recursive style.
+    *
+    * FE (step = 2): 1,2,3,6,7,8,11,12,15
+    * converted into
+    * (1,(1,2,3)) (2,(6,7,8)) (3,(11,12))  (4,(15))
+    *
+    */
+  def filterFABars(seqB :Seq[barsFaData], groupIntervalSec :Int) : Seq[(Int,barsFaData)] ={
+
+    val acc_bar = seqB.head
+
+    /**
+      * Grouping sequences of bars. Excluding neighboring bars.
+    */
+    val r = seqB.tail.foldLeft(List((1,acc_bar))) ((acc :List[(Int,barsFaData)],elm :barsFaData) =>
+      if ((elm.TsEnd - acc.head._2.TsEnd)/1000L < groupIntervalSec)
+        ((acc.head._1, elm) :: acc)
+      else
+        ((acc.head._1+1, elm) :: acc)
+    ).reverse
+
+    r.groupBy(elm => elm._1).map(
+      s => (s._1,s._2.filter(
+        e => e._2.TsEnd == (s._2.map(
+          b => b._2.TsEnd).max)
+      ))
+    ).toSeq.map(elm => elm._2).flatten.sortBy(e => e._2.TsEnd) //.toList.sortBy(elm => elm._1)//.flatten
+
+  }
+  /** ---------------------------------------------------------------------------------------- */
 
 
 }
