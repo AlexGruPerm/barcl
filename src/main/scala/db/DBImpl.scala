@@ -33,6 +33,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllBarsFAMeta : Seq[barsFaMeta]
   def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData]
   def filterFABars(seqB :Seq[barsFaData], groupIntervalSec :Int) : Seq[(Int,barsFaData)]
+  //def getFaBarsFiltered(seqBars :Seq[barsFaData],resType :String,futureInterval :Double,groupIntervalSec :Int) :Seq[barsFaData]
 
 }
 
@@ -205,6 +206,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                       ddate         = :p_ddate
                 allow filtering; """).bind()
 
+
+
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
     *
@@ -348,7 +351,20 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     )
   }
 
-  val rowToBarFAData = (row :Row, tickerID :Int, barWidthSec :Int, dDate :LocalDate) => {
+  val rowToBarFAData = (row :Row, tickerID :Int, barWidthSec :Int, dDate :LocalDate, colsBarsNames :Seq[String]) => {
+    val r = for (cn <- colsBarsNames) yield {
+      new barsFaData(
+        tickerID,
+        barWidthSec,
+        dDate,
+        row.getLong("ts_end"),
+        cn,
+        row.getMap(cn, classOf[String], classOf[String]).asScala.toMap.get("res").getOrElse("nn"),
+        row.getMap(cn, classOf[String], classOf[String]).asScala.toMap
+      )
+    }
+    r
+    /*
     val map_res_0_219 = row.getMap("res_0_219", classOf[String], classOf[String]).asScala.toMap
     val map_res_0_437 = row.getMap("res_0_437", classOf[String], classOf[String]).asScala.toMap
     val map_res_0_873 = row.getMap("res_0_873", classOf[String], classOf[String]).asScala.toMap
@@ -361,6 +377,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       (map_res_0_437.get("res").getOrElse("nn"), map_res_0_437),
       (map_res_0_873.get("res").getOrElse("nn"), map_res_0_873)
     )
+    */
   }
 
   /**
@@ -616,12 +633,26 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
   */
   def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData] = {
+
+    val oneBarForGetMeta = seqB.head
+
+    val colDef = session.execute(bndBarsFaData
+                                 .setInt("p_ticker_id", oneBarForGetMeta.tickerId)
+                                 .setInt("p_bar_width_sec",oneBarForGetMeta.barWidthSec)
+                                 .setDate("p_ddate",oneBarForGetMeta.dDate)).getColumnDefinitions
+
+    val colsBarsNames :Seq[String] = for (thisColumn <- colDef.asList().asScala
+                                          if thisColumn.getName().substring(0,5) == "res_0") yield
+      thisColumn.getName()
+
+    logger.debug(">>>>>>>>>>>>>>>   "+colsBarsNames)
+
     seqB.flatMap(sb => session.execute(bndBarsFaData
       .setInt("p_ticker_id", sb.tickerId)
       .setInt("p_bar_width_sec",sb.barWidthSec)
       .setDate("p_ddate",sb.dDate))
       .all()
-      .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+      .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate, colsBarsNames)).flatten
       .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd))
     )
   }
@@ -660,6 +691,22 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
   /** ---------------------------------------------------------------------------------------- */
 
+  /*
+  def getFaBarsFiltered(seqBars :Seq[barsFaData], resType :String, futureInterval :Double, groupIntervalSec :Int) :Seq[barsFaData] ={
+
+    val faBars: Seq[barsFaData] = futureInterval match {
+      case (intSec == 0.219) => seqBars.filter (b => b.res_0_219._1 == resType)
+      case (intSec == 0.437) => seqBars.filter (b => b.res_0_437._1 == resType)
+      case (intSec == 0.873) => seqBars.filter (b => b.res_0_873._1 == resType)
+    }
+    logger.debug("MXBars.size = "+faBars.size)
+
+    val faBarsGrp :Seq[(Int,barsFaData)]  = filterFABars(faBars,groupIntervalSec)
+
+    logger.debug("After Filtering by last basrs in form : faBarsGrpMx.size = "+faBarsGrp.size)
+    faBarsGrp.map(e => e._2)
+  }
+  */
 
 }
 

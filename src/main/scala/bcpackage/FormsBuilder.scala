@@ -20,17 +20,29 @@ class FormsBuilder(nodeAddress :String) {
           logger.debug("allFABars for " + bfm + " SIZE " + allFABars.size + "  (" + allFABars.head.TsEnd + ") " +
            " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" + SizeEstimator.estimate(allFABars)/1024L/1024L + " Mb.")
 
-          val faBarsMX: Seq[barsFaData] = allFABars.filter(b => b.res_0_219._1 == "mx")
-          val faBarsMN: Seq[barsFaData] = allFABars.filter(b => b.res_0_219._1 == "mn")
 
-          logger.debug("MXBars.size = "+faBarsMX.size+" MNBars.size = "+faBarsMN.size)
+          for (b <- allFABars){
+            println(b)
+          }
+
+
+         // val faMx0219 :Seq[barsFaData] = dbInst.getFaBarsFiltered(allFABars, "mx",0.219,10000)
+
+
+          val faBarsMX: Seq[barsFaData] = allFABars.filter(b => (b.resInterval=="res_0_219" && b.resType=="mx"))
+
+          logger.debug("faBarsMX.size = "+faBarsMX.size)
+
 
           val faBarsGrpMx :Seq[(Int,barsFaData)]  = dbInst.filterFABars(faBarsMX,10000 /* groups interval 10 min*/)
-          logger.debug("faBarsGrpMx.size = "+faBarsGrpMx.size+"")
+
+          logger.debug("--------------- faBarsGrpMx.size = "+faBarsGrpMx.size)
 
           for(elm <- faBarsGrpMx){
-            println(elm._2.TsEnd+" - "+elm._2.res_0_219._2)
+            println(elm._2.TsEnd+" - "+elm._2.res)
           }
+
+
 
           logger.debug("=============================================================================================")
           logger.debug("   ")

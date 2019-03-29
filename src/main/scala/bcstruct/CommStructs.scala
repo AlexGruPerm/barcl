@@ -195,8 +195,9 @@ case class  barsFaData(
                        barWidthSec :Int,
                        dDate       :LocalDate,
                        TsEnd       :Long,
-                       res_0_219   :(String,Map[String,String]), // key it's mn, mx, bt, nn : MAP ("durSec" : "69529","ts_end" : "1551208538813")
-                       res_0_437   :(String,Map[String,String]),
-                       res_0_873   :(String,Map[String,String])
+                       resInterval :String,
+                       resType     :String, // mx,mn,bt,nn
+                       res         :Map[String,String]
                      )
+
 
