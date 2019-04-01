@@ -35,6 +35,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData]
   def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
+  def getAllTicksForForm(tickerID :Int, tsMin :Long, tsMax :Long, ddateMax : LocalDate) :Seq[tinyTick]
   //def getFaBarsFiltered(seqBars :Seq[barsFaData],resType :String,futureInterval :Double,groupIntervalSec :Int) :Seq[barsFaData]
 
 }
@@ -477,7 +478,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
    session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-     .filter(r =>  r.tickerId==1 && r.barWidthSec==3600)//-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+     .filter(r =>  r.tickerId==1 /*&& r.barWidthSec==3600*/)//-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -617,7 +618,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      .filter(r =>  r.tickerId==1 && r.barWidthSec==3600) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+      .filter(r =>  r.tickerId==1 && r.barWidthSec==30/*3600*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -700,6 +701,13 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .all()
       .iterator.asScala.toSeq.map(r => rowToTinyTick(r/*, sb.tickerId, sb.barWidthSec, sb.dDate*/))
       .sortBy(sr => (sr.db_tsunx))
+  }
+
+  /**
+    * Read all ticks for this tickerID and ts interval, additional less than ddateMax
+    */
+  def getAllTicksForForm(tickerID :Int, tsMin :Long, tsMax :Long, ddateMax : LocalDate) :Seq[tinyTick] ={
+    //read ddate distinct and then read all ticks by this ddates.
   }
 
 }

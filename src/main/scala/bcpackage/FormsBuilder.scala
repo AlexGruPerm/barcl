@@ -1,6 +1,6 @@
 package bcpackage
 
-import bcstruct.{barsFaData, barsFaMeta}
+import bcstruct.{bForm, barsFaData, barsFaMeta}
 import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
@@ -41,15 +41,29 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
                thisPercent => dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
             )
           )
-          //         debugLastBarsOfGrp(lastBarsOfForms)
+          //debugLastBarsOfGrp(lastBarsOfForms)
+          logger.info("lastBarsOfForms ROWS="+lastBarsOfForms.size+" SIZE OF WHOLE  = "+ SizeEstimator.estimate(lastBarsOfForms)/1024L  +" Kb.")
 
 
+          val seqFormTinyTicks = dbInst.getAllTicksForForm(tickerId,(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L),lb.TsEnd,lb.dDate)
+
+          /*
+          val seqForms : Seq[bForm] =
          lastBarsOfForms.collect {
            case (grpNum: Int, lb: barsFaData) =>
               val seqFormTinyTicks = dbInst.getTicksForForm(tickerId,(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L),lb.TsEnd,lb.dDate)
-             logger.info("tickerId="+tickerId+" group="+grpNum+" tsEnd="+lb.TsEnd+" seqFormTinyTicks.ROWS = "+
-               seqFormTinyTicks.size+" SIZE = "+ SizeEstimator.estimate(seqFormTinyTicks)/1024L/1024L  +" Mb.")
+             logger.info(">>>  tickerId="+tickerId+" group="+grpNum+" ts_begin="+(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L)+
+               " tsEnd="+lb.TsEnd+" seqFormTinyTicks.ROWS = "+
+               seqFormTinyTicks.size+" SIZE = "+ SizeEstimator.estimate(seqFormTinyTicks)/1024L +" Kb.")
+              new bForm(lb,formDeepKoef,seqFormTinyTicks)
           }
+          logger.debug(" ======== seqForms.ROWS=["+ seqForms.size +"] SIZE =["+ SizeEstimator.estimate(seqForms)/1024L +"] Kb. ========")
+         */
+
+          /**
+            * Here place of calculation forms properties, that will be used in DL,AI research for predictions.
+          */
+
 
 
 

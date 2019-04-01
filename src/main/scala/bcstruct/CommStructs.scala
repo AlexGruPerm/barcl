@@ -203,3 +203,11 @@ case class tinyTick(
                      ask       :Double,
                      bid       :Double
                    )
+
+     class bForm(
+                 barFa        :barsFaData,
+                 formDeepKoef :Int,
+                 seqTicks     :Seq[tinyTick]
+                ) {
+       val tickCnt :Int  = seqTicks.size
+     }

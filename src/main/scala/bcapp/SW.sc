@@ -1,4 +1,18 @@
 
+val l :Seq[Int] = Seq(1,2,4,3,5,6,9,7)
+val cur = l.init
+val nxt = l.tail
+
+def getCntMovingHigh (s : Seq[Int]) : (Int,Int) =
+  (s.size,s.sum)
+
+
+//val cntUp =
+ val cntUp   = getCntMovingHigh(cur.zip(nxt).filter{case (c,n) => (n>c)})
+ val cntDown = cur.zip(nxt).filter{case (c,n) => (n<c)}.size
+
+/*
+
 val s :Seq[Long] = Seq(
   17990,7199,43201,10792,
   88820,//188820,
@@ -17,7 +31,7 @@ val sumKv = s.map(v => Math.pow((v-mo),2)).sum
 
 val disp = sumKv / s.size
 
-
+*/
 
 
 
