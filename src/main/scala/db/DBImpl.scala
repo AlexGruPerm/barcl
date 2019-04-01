@@ -33,7 +33,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   // For FormsBuilder
   def getAllBarsFAMeta : Seq[barsFaMeta]
   def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData]
-  def filterFABars(seqB :Seq[barsFaData], groupIntervalSec :Int) : Seq[(Int,barsFaData)]
+  def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)]
   //def getFaBarsFiltered(seqBars :Seq[barsFaData],resType :String,futureInterval :Double,groupIntervalSec :Int) :Seq[barsFaData]
 
 }
@@ -643,8 +643,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * (1,(1,2,3)) (2,(6,7,8)) (3,(11,12))  (4,(15))
     *
     */
-  def filterFABars(seqB :Seq[barsFaData], groupIntervalSec :Int) : Seq[(Int,barsFaData)] ={
-
+  def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)] = {
+    val groupIntervalSec = seqB.head.barWidthSec * intervalNewGroupKoeff
     val acc_bar = seqB.head
 
     /**
@@ -662,28 +662,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         e => e._2.TsEnd == (s._2.map(
           b => b._2.TsEnd).max)
       ))
-    ).toSeq.map(elm => elm._2).flatten.sortBy(e => e._2.TsEnd) //.toList.sortBy(elm => elm._1)//.flatten
+    ).toSeq.map(elm => elm._2).flatten.sortBy(e => e._2.TsEnd)
 
   }
   /** ---------------------------------------------------------------------------------------- */
-
-  /*
-  def getFaBarsFiltered(seqBars :Seq[barsFaData], resType :String, futureInterval :Double, groupIntervalSec :Int) :Seq[barsFaData] ={
-
-    val faBars: Seq[barsFaData] = futureInterval match {
-      case (intSec == 0.219) => seqBars.filter (b => b.res_0_219._1 == resType)
-      case (intSec == 0.437) => seqBars.filter (b => b.res_0_437._1 == resType)
-      case (intSec == 0.873) => seqBars.filter (b => b.res_0_873._1 == resType)
-    }
-    logger.debug("MXBars.size = "+faBars.size)
-
-    val faBarsGrp :Seq[(Int,barsFaData)]  = filterFABars(faBars,groupIntervalSec)
-
-    logger.debug("After Filtering by last basrs in form : faBarsGrpMx.size = "+faBarsGrp.size)
-    faBarsGrp.map(e => e._2)
-  }
-  */
-
 }
 
 

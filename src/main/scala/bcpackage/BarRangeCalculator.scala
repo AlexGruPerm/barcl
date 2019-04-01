@@ -43,7 +43,7 @@ class BarRangeCalculator(nodeAddress :String, prcntsDiv: Seq[Double]) {
             r.resType,
             Map(
               "ts_end" -> (r.resAnal match {case Some(ri) => ri.ts_end.toString case None => ""}),
-              "durSec" -> (r.resAnal match {case Some(ri) => Math.round(( (ri.ts_end + ri.ts_begin)/2L - r.srcBar.ts_end)/1000L).toString case None => "0"})
+              "durSec" -> (r.resAnal match {case Some(ri) => Math.round((/*  (ri.ts_end + ri.ts_begin)/2L  */ ri.ts_end - r.srcBar.ts_end)/1000L).toString case None => "0"})
             )
           ))
 

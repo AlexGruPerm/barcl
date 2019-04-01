@@ -1,4 +1,29 @@
 
+val s :Seq[Long] = Seq(
+  17990,7199,43201,10792,
+  88820,//188820,
+  39622,10800,10804,
+  61197,
+  7200,39629,43202,14401,
+  121213,//221213,
+  7184,
+  14399)
+
+val mo = s.sum / s.size
+
+math.pow(2,3)
+
+val sumKv = s.map(v => Math.pow((v-mo),2)).sum
+
+val disp = sumKv / s.size
+
+
+
+
+
+
+
+/*
 case class bar(ts:Int, v :Int)
 
 val l = List(
@@ -32,7 +57,7 @@ val f = r.groupBy(elm => elm._1).map(
   ))
 ).toSeq.sortBy(elm => elm._1).map(elm => elm._2)
 
-
+*/
 
 
 /*

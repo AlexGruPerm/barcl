@@ -5,43 +5,44 @@ import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
-class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double]) {
+class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :Int, intervalNewGroupKoeff :Int) {
   val logger = LoggerFactory.getLogger(getClass.getName)
+
+  def  allFABarsDebugLog(tickerId :Int,barWidthSec :Int,allFABars : Seq[barsFaData] ) ={
+    logger.debug("allFABars for " + (tickerId,barWidthSec) + " SIZE " + allFABars.size + "  (" + allFABars.head.TsEnd + ") " +
+      " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" + SizeEstimator.estimate(allFABars)/1024L/1024L + " Mb.")
+  }
+
+  def debugLastBarsOfGrp(lastBarsOfForms :Seq[(Int, barsFaData)]) ={
+    for(elm <- lastBarsOfForms){
+      logger.debug("Group=["+elm._1+"]  Bar = "+elm._2)
+    }
+  }
+
 
   def calcIteration(dbInst :DBImpl) = {
    val barsFaMeta :Seq[barsFaMeta] =  dbInst.getAllBarsFAMeta
     logger.debug("barsFaMeta.size="+barsFaMeta.size)
+    /**
+      * Read bars from mts_bars.bars_fa with iterations by (tickerId,barWidthSec)
+      *  internally by each ddate.
+      *  Next grouping bars (by resType and prcntsDiv) for separated groups. We need eliminate neighboring bars. And keep only last bars for each groups.
+      *
+    */
     barsFaMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct
       .collect {
         case (tickerId,barWidthSec) =>
-        //bfm =>
-          logger.debug("   ")
-          logger.debug("=============================================================================================")
-          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFaMeta.filter(r => r.tickerId == tickerId/*bfm._1*/ && r.barWidthSec == barWidthSec/*bfm._2*/))
-          logger.debug("allFABars for " + (tickerId,barWidthSec) + " SIZE " + allFABars.size + "  (" + allFABars.head.TsEnd + ") " +
-           " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" + SizeEstimator.estimate(allFABars)/1024L/1024L + " Mb.")
+          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFaMeta.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
+          allFABarsDebugLog(tickerId,barWidthSec,allFABars)
+          val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
+            .flatMap(resType =>
+              prcntsDiv.flatMap(
+               thisPercent => dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
+            )
+          )
+          debugLastBarsOfGrp(lastBarsOfForms)
 
 
-          for (b <- allFABars){
-            println(b)
-          }
-
-
-         // val faMx0219 :Seq[barsFaData] = dbInst.getFaBarsFiltered(allFABars, "mx",0.219,10000)
-
-/*
-          val faBarsMX: Seq[barsFaData] = allFABars.filter(b => (b.resInterval=="res_0_219" && b.resType=="mx"))
-          logger.debug("faBarsMX.size = "+faBarsMX.size)
-          val faBarsGrpMx :Seq[(Int,barsFaData)]  = dbInst.filterFABars(faBarsMX,10000 /* groups interval 10 min*/)
-          logger.debug("--------------- faBarsGrpMx.size = "+faBarsGrpMx.size)
-          for(elm <- faBarsGrpMx){
-            println(elm._2.TsEnd+" - "+elm._2.res)
-          }
-*/
-
-
-          logger.debug("=============================================================================================")
-          logger.debug("   ")
     }
   }
 
