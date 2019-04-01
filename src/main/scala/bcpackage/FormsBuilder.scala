@@ -41,7 +41,15 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
                thisPercent => dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
             )
           )
-          debugLastBarsOfGrp(lastBarsOfForms)
+          //         debugLastBarsOfGrp(lastBarsOfForms)
+
+
+         lastBarsOfForms.collect {
+           case (grpNum: Int, lb: barsFaData) =>
+              val seqFormTinyTicks = dbInst.getTicksForForm(tickerId,(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L),lb.TsEnd,lb.dDate)
+             logger.info("tickerId="+tickerId+" group="+grpNum+" tsEnd="+lb.TsEnd+" seqFormTinyTicks.ROWS = "+
+               seqFormTinyTicks.size+" SIZE = "+ SizeEstimator.estimate(seqFormTinyTicks)/1024L/1024L  +" Mb.")
+          }
 
 
 

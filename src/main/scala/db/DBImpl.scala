@@ -375,6 +375,15 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       )
   }
 
+
+  val rowToTinyTick = (row :Row) => {
+    new tinyTick(
+      row.getLong("db_tsunx"),
+      row.getDouble("ask"),
+      row.getDouble("bid")
+    )
+  }
+
   /**
     * Read and return seq of ticks for this ticker_id and interval by ts: tsBegin - tsEnd (unix timestamp)
   */
@@ -689,17 +698,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .setLong("p_ts_end",tsEnd)
       .setDate("p_ddate",ddateEnd))
       .all()
-      .iterator.asScala.toSeq.map(r => rowToBarData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
-      .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.ts_end))
-
-
-
-
-
-
+      .iterator.asScala.toSeq.map(r => rowToTinyTick(r/*, sb.tickerId, sb.barWidthSec, sb.dDate*/))
+      .sortBy(sr => (sr.db_tsunx))
   }
-
-
 
 }
 
