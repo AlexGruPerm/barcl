@@ -34,6 +34,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllBarsFAMeta : Seq[barsFaMeta]
   def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData]
   def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)]
+  def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
   //def getFaBarsFiltered(seqBars :Seq[barsFaData],resType :String,futureInterval :Double,groupIntervalSec :Int) :Seq[barsFaData]
 
 }
@@ -206,8 +207,18 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                       bar_width_sec = :p_bar_width_sec and
                       ddate         = :p_ddate
                 allow filtering; """).bind()
-
-
+/**
+  * may be here make double read, first determine ddate BEGIN by b_tsunx >= and second read with 2 ddates.
+*/
+  val bndTinyTicks = session.prepare(
+    """ select db_tsunx,ask,bid
+          from mts_src.ticks
+         where ticker_id = :p_ticker_id and
+               db_tsunx >= :p_ts_begin and
+               db_tsunx <= :p_ts_end and
+               ddate <= :p_ddate
+         allow filtering """
+  ).bind()
 
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
@@ -666,6 +677,30 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   }
   /** ---------------------------------------------------------------------------------------- */
+
+
+  /**
+    * read all ticks for this Form ts interval. For deep micro structure analyze.
+  */
+  def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick] = {
+    session.execute(bndTinyTicks
+      .setInt("p_ticker_id", tickerID)
+      .setLong("p_ts_begin",tsBegin)
+      .setLong("p_ts_end",tsEnd)
+      .setDate("p_ddate",ddateEnd))
+      .all()
+      .iterator.asScala.toSeq.map(r => rowToBarData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+      .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.ts_end))
+
+
+
+
+
+
+  }
+
+
+
 }
 
 

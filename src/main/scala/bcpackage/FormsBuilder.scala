@@ -14,8 +14,9 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
   }
 
   def debugLastBarsOfGrp(lastBarsOfForms :Seq[(Int, barsFaData)]) ={
-    for(elm <- lastBarsOfForms){
-      logger.debug("Group=["+elm._1+"]  Bar = "+elm._2)
+    lastBarsOfForms.collect {
+      case (grpNum: Int, bar: barsFaData) =>
+        logger.debug("Group=["+grpNum+"] Form_beginTS=["+(bar.TsEnd - formDeepKoef*bar.barWidthSec*1000L)+"]  Bar = "+bar)
     }
   }
 
@@ -41,6 +42,7 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
             )
           )
           debugLastBarsOfGrp(lastBarsOfForms)
+
 
 
     }
