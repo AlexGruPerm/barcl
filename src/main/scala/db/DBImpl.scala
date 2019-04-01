@@ -25,6 +25,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getTicksByInterval(cp :CalcProperty, tsBegin :Long, tsEnd :Long) : (seqTicksObj,Long)
   def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
   def saveBars(seqBarsCalced :Seq[Bar])
+  //For Bar range calculator
   def getAllBarsHistMeta : Seq[barsMeta]
   def getAllCalcedBars(seqB :Seq[barsMeta]) : Seq[barsForFutAnalyze]
   def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) : Seq[barsFutAnalyzeRes]
@@ -188,8 +189,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
          allow filtering; """).bind()
 
   val bndSaveFa =session.prepare(
-    """ insert into mts_bars.bars_fa(ticker_id, bar_width_sec, ddate, ts_end, res_0_219, res_0_437, res_0_873)
-                              values(:p_ticker_id, :p_bar_width_sec, :p_ddate, :p_ts_end, :p_res_0_219, :p_res_0_437, :p_res_0_873) """)//.bind()
+    """ insert into mts_bars.bars_fa(ticker_id,    ddate,    bar_width_sec,    ts_end,     prcnt,    res_type,    res )
+                                      values(:p_ticker_id, :p_ddate, :p_bar_width_sec, :p_ts_end, :p_prcnt, :p_res_type, :p_res) """)
 
   val bndBarsFAMeta = session.prepare(
     """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """).bind()
@@ -197,9 +198,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   val bndBarsFaData = session.prepare(
     """ select
  	                    ts_end,
- 	                    res_0_219,
- 	                    res_0_437,
- 	                    res_0_873
+                      prcnt,
+                      res_type,
+ 	                    res
                  from mts_bars.bars_fa
                 where ticker_id     = :p_ticker_id and
                       bar_width_sec = :p_bar_width_sec and
@@ -351,33 +352,16 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     )
   }
 
-  val rowToBarFAData = (row :Row, tickerID :Int, barWidthSec :Int, dDate :LocalDate, colsBarsNames :Seq[String]) => {
-    val r = for (cn <- colsBarsNames) yield {
+  val rowToBarFAData = (row :Row, tickerID :Int, barWidthSec :Int, dDate :LocalDate) => {
       new barsFaData(
         tickerID,
         barWidthSec,
         dDate,
         row.getLong("ts_end"),
-        cn,
-        row.getMap(cn, classOf[String], classOf[String]).asScala.toMap.get("res").getOrElse("nn"),
-        row.getMap(cn, classOf[String], classOf[String]).asScala.toMap
+        row.getDouble("prcnt"),
+        row.getString("res_type"),
+        row.getMap("res", classOf[String], classOf[String]).asScala.toMap
       )
-    }
-    r
-    /*
-    val map_res_0_219 = row.getMap("res_0_219", classOf[String], classOf[String]).asScala.toMap
-    val map_res_0_437 = row.getMap("res_0_437", classOf[String], classOf[String]).asScala.toMap
-    val map_res_0_873 = row.getMap("res_0_873", classOf[String], classOf[String]).asScala.toMap
-    new barsFaData(
-      tickerID,
-      barWidthSec,
-      dDate,
-      row.getLong("ts_end"),
-      (map_res_0_219.get("res").getOrElse("nn"), map_res_0_219),
-      (map_res_0_437.get("res").getOrElse("nn"), map_res_0_437),
-      (map_res_0_873.get("res").getOrElse("nn"), map_res_0_873)
-    )
-    */
   }
 
   /**
@@ -586,16 +570,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * Save results of Future analyze into DB mts_bars.bars_fa
     */
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB]) = {
-    val preparedSeq = for(b <- seqFA) yield {
-      // _1-bar  _2,_3,_4-Maps
-       (b.currB,
-        b.futBarsRes.find(b => b._1 == 0.219),
-        b.futBarsRes.find(b => b._1 == 0.437),
-        b.futBarsRes.find(b => b._1 == 0.873)
-       )
-    }
 
-    val partsSeqBarFa = preparedSeq.grouped(100)//other limit 65535 for tiny rows.
+    val partsSeqBarFa = seqFA.grouped(100)//other limit 65535 for tiny rows.
 
     for(thisPartOfSeq <- partsSeqBarFa) {
       //logger.debug("INSIDE [saveBarsFutAnal] SIZE OF thisPartOfSeq = "+thisPartOfSeq.size)
@@ -603,18 +579,17 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       thisPartOfSeq.foreach {
         t =>
           batch.add(bndSaveFa.bind()
-            .setInt("p_ticker_id", t._1.tickerId)
-            .setInt("p_bar_width_sec",t._1.barWidthSec)
-            .setDate("p_ddate", t._1.dDate)
-            .setLong("p_ts_end", t._1.ts_end)
-            .setMap("p_res_0_219", t._2 match {case Some(m) => m._2.asJava case None => Map("res" -> "nn").asJava})
-            .setMap("p_res_0_437", t._3 match {case Some(m) => m._2.asJava case None => Map("res" -> "nn").asJava})
-            .setMap("p_res_0_873", t._4 match {case Some(m) => m._2.asJava case None => Map("res" -> "nn").asJava})
+            .setInt("p_ticker_id", t.tickerId)
+            .setDate("p_ddate", t.dDate)
+            .setInt("p_bar_width_sec",t.barWidthSec)
+            .setLong("p_ts_end", t.ts_end)
+            .setDouble("p_prcnt",t.prcnt)
+            .setString("p_res_type",t.res_type)
+            .setMap("p_res", t.res.asJava)
           )
       }
       session.execute(batch)
     }
-
   }
   /** ------------------------------------------------------- */
 
@@ -633,7 +608,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
   */
   def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData] = {
-
+    /*
     val oneBarForGetMeta = seqB.head
 
     val colDef = session.execute(bndBarsFaData
@@ -646,13 +621,14 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       thisColumn.getName()
 
     logger.debug(">>>>>>>>>>>>>>>   "+colsBarsNames)
+    */
 
     seqB.flatMap(sb => session.execute(bndBarsFaData
       .setInt("p_ticker_id", sb.tickerId)
       .setInt("p_bar_width_sec",sb.barWidthSec)
       .setDate("p_ddate",sb.dDate))
       .all()
-      .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate, colsBarsNames)).flatten
+      .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))//.flatten
       .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd))
     )
   }

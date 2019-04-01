@@ -5,7 +5,7 @@ import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
-class BarRangeCalculator(nodeAddress :String, seqPrcnts: Seq[Int]) {
+class BarRangeCalculator(nodeAddress :String, prcntsDiv: Seq[Double]) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
 
@@ -17,43 +17,38 @@ class BarRangeCalculator(nodeAddress :String, seqPrcnts: Seq[Int]) {
         logger.debug("allBars BY ["+bhm._1+","+bhm._2+"] SIZE = " + allBars.size+"  ("+allBars.head.ts_end+" - "+allBars.last.ts_end+") "+
                                                                " (" + allBars.head.dDate+" - "+allBars.last.dDate+") SIZE="+SizeEstimator.estimate(dbInst)+" bytes.")
 
-        val prcntsDiv = Seq(0.219,0.437,0.873)
         val prcntsDivSize = prcntsDiv.size
         val t1FAnal = System.currentTimeMillis
         val futAnalRes :Seq[barsFutAnalyzeRes] = prcntsDiv.flatMap(p => dbInst.makeAnalyze(allBars,p))
         val t2FAnal = System.currentTimeMillis
         logger.debug("After analyze RES.size = "+futAnalRes.size+" Duration "+(t2FAnal-t1FAnal)+" msecs.")
 
-        /**
-          *
-          *  !!!
-          *  .sliding(prcntsDivSize, prcntsDivSize) made fore performance optimization, old code:
-          *
-          *   val resFSave :Seq[barsResToSaveDB] = futAnalRes.map(b => b.srcBar.ts_end).distinct.map(
-          *      thisTsEnd => new barsResToSaveDB(futAnalRes.filter(ab => ab.srcBar.ts_end == thisTsEnd)))
-          *
-          *   Here difficult distinct operation and and filter for grouping rows by "ab.srcBar.ts_end"
-          *
-        */
         val t1FS = System.currentTimeMillis
+
+        /**
+          * Old algo when it was converted into columns of type Map.
+          * */
+        /*
         val resFSave :Seq[barsResToSaveDB] = futAnalRes.sortBy(t => t.srcBar.ts_end).sliding(prcntsDivSize, prcntsDivSize)
           .filter(elm => elm.size == prcntsDivSize)
           .map(intList => new barsResToSaveDB(intList)).to[collection.immutable.Seq]
+        */
+        val resFSave :Seq[barsResToSaveDB] = futAnalRes.sortBy(t => t.srcBar.ts_end)
+          .map(r => new barsResToSaveDB(
+            r.srcBar.tickerId,
+            r.srcBar.barWidthSec,
+            r.srcBar.dDate,
+            r.srcBar.ts_end,
+            r.p,
+            r.resType,
+            Map(
+              "ts_end" -> (r.resAnal match {case Some(ri) => ri.ts_end.toString case None => ""}),
+              "durSec" -> (r.resAnal match {case Some(ri) => Math.round(( (ri.ts_end + ri.ts_begin)/2L - r.srcBar.ts_end)/1000L).toString case None => "0"})
+            )
+          ))
+
         val t2FS = System.currentTimeMillis
         logger.info("Duration of gathering resFSave - "+(t2FS - t1FS) + " msecs.")
-
-        /*
-      logger.debug("=======================================================")
-      for(sr <- resFSave) {
-        logger.debug(sr.currB.toString)
-         for(r <- sr.futBarsRes){
-           logger.debug("   "+r.toString())
-         }
-        logger.debug("      ")
-      }
-      logger.debug("=======================================================")
-*/
-
 
         val t1Save = System.currentTimeMillis
         dbInst.saveBarsFutAnal(resFSave)

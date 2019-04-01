@@ -170,9 +170,24 @@ case class barsFutAnalyzeRes(
   * -----
 */
 
+
+case class barsResToSaveDB(
+                            tickerId      :Int,
+                            barWidthSec   :Int,
+                            dDate         :LocalDate,
+                            ts_end        :Long,
+                            prcnt         :Double,
+                            res_type      :String,
+                            res           :Map[String,String]
+                          )
+
+
+
+/*
 class barsResToSaveDB(seqBRes :Seq[barsFutAnalyzeRes]) {
   val currB : barsForFutAnalyze = seqBRes.head.srcBar
-  val futBarsRes :Seq[(Double,Map[String,String])] = seqBRes.map(sb =>
+  val futBarsRes :Seq[(Double,Map[String,String])] =
+    seqBRes.map(sb =>
     (sb.p,Map(
               "res"    -> sb.resType,
               "ts_end" -> (sb.resAnal match {case Some(r) => r.ts_end.toString case None => ""}),
@@ -182,6 +197,7 @@ class barsResToSaveDB(seqBRes :Seq[barsFutAnalyzeRes]) {
     )
   )
   }
+*/
 
 case class barsFaMeta(
                      tickerId    :Int,
@@ -195,8 +211,8 @@ case class  barsFaData(
                        barWidthSec :Int,
                        dDate       :LocalDate,
                        TsEnd       :Long,
-                       resInterval :String,
-                       resType     :String, // mx,mn,bt,nn
+                       prcnt       :Double,
+                       resType     :String,
                        res         :Map[String,String]
                      )
 

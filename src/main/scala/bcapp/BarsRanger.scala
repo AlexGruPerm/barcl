@@ -8,10 +8,10 @@ object BarsRanger extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
   val node: String = "10.241.5.234"
   val dbType: String = "cassandra"
-  val seqLogDiff : Seq[Int] = Seq(5,10,15) //Fut analyze search percents, price go up or down on 5,10.. precents.
+  val prcntsDiv : Seq[Double] = Seq(0.219, 0.437, 0.873) //Fut analyze search percents, price go up or down
 
   try {
-    (new BarRangeCalculator(node,seqLogDiff)).run
+    (new BarRangeCalculator(node,prcntsDiv)).run
   } catch {
     case ex: Throwable => ex.printStackTrace()
   }
