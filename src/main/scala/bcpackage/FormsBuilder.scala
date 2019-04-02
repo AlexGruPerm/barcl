@@ -1,6 +1,6 @@
 package bcpackage
 
-import bcstruct.{bForm, barsFaData, barsFaMeta}
+import bcstruct.{bForm, barsFaData, barsFaMeta, tinyTick}
 import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
@@ -35,6 +35,7 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
         case (tickerId,barWidthSec) =>
           val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFaMeta.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
           allFABarsDebugLog(tickerId,barWidthSec,allFABars)
+
           val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
             .flatMap(resType =>
               prcntsDiv.flatMap(
@@ -44,29 +45,37 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
           //debugLastBarsOfGrp(lastBarsOfForms)
           logger.info("lastBarsOfForms ROWS="+lastBarsOfForms.size+" SIZE OF WHOLE  = "+ SizeEstimator.estimate(lastBarsOfForms)/1024L  +" Kb.")
 
+          val firstBarOfLastBars :barsFaData = lastBarsOfForms.map(b => b._2).head
+          val lastBarOfLastBars :barsFaData = lastBarsOfForms.map(b => b._2).last
 
-          val seqFormTinyTicks = dbInst.getAllTicksForForm(tickerId,(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L),lb.TsEnd,lb.dDate)
+          logger.debug("FirstBarOfForms TS_END="+firstBarOfLastBars.TsEnd+"    LastBarOfForms TS_END="+lastBarOfLastBars.TsEnd)
 
-          /*
+          val seqFormAllTinyTicks :Seq[tinyTick] = dbInst.getAllTicksForForms(
+            tickerId,
+            firstBarOfLastBars.TsEnd,
+            lastBarOfLastBars.TsEnd,
+            firstBarOfLastBars.dDate,
+            lastBarOfLastBars.dDate)
+
+          logger.debug(" =[1]======= seqFormAllTinyTicks.ROWS=["+ seqFormAllTinyTicks.size +"] SIZE =["+ SizeEstimator.estimate(seqFormAllTinyTicks)/1024L/1024L +"] Mb. ========")
+
+
           val seqForms : Seq[bForm] =
          lastBarsOfForms.collect {
            case (grpNum: Int, lb: barsFaData) =>
-              val seqFormTinyTicks = dbInst.getTicksForForm(tickerId,(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L),lb.TsEnd,lb.dDate)
+              val seqFormTicks :Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L) && t.db_tsunx <= lb.TsEnd)
+
+             /*
              logger.info(">>>  tickerId="+tickerId+" group="+grpNum+" ts_begin="+(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L)+
-               " tsEnd="+lb.TsEnd+" seqFormTinyTicks.ROWS = "+
-               seqFormTinyTicks.size+" SIZE = "+ SizeEstimator.estimate(seqFormTinyTicks)/1024L +" Kb.")
-              new bForm(lb,formDeepKoef,seqFormTinyTicks)
+               " tsEnd="+lb.TsEnd+" seqFormTicks.ROWS = "+
+               seqFormTicks.size+" SIZE = "+ SizeEstimator.estimate(seqFormTicks)/1024L +" Kb.")
+             */
+
+              bForm.create(lb,formDeepKoef,seqFormTicks)
           }
-          logger.debug(" ======== seqForms.ROWS=["+ seqForms.size +"] SIZE =["+ SizeEstimator.estimate(seqForms)/1024L +"] Kb. ========")
-         */
+          logger.debug(" =[2]======= seqForms.ROWS=["+ seqForms.size +"] SIZE =["+ SizeEstimator.estimate(seqForms)/1024L +"] Kb. ========")
 
-          /**
-            * Here place of calculation forms properties, that will be used in DL,AI research for predictions.
-          */
-
-
-
-
+          dbInst.saveForms(seqForms)
     }
   }
 

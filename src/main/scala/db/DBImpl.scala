@@ -4,6 +4,7 @@ import bcstruct.{barsForFutAnalyze, barsMeta, barsResToSaveDB, _}
 import com.datastax.driver.core
 import com.datastax.driver.core.exceptions.NoHostAvailableException
 import com.datastax.driver.core._
+import com.madhukaraphatak.sizeof.SizeEstimator
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -35,7 +36,8 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData]
   def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
-  def getAllTicksForForm(tickerID :Int, tsMin :Long, tsMax :Long, ddateMax : LocalDate) :Seq[tinyTick]
+  def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick]
+  def saveForms(seqForm : Seq[bForm])
   //def getFaBarsFiltered(seqBars :Seq[barsFaData],resType :String,futureInterval :Double,groupIntervalSec :Int) :Seq[barsFaData]
 
 }
@@ -220,6 +222,25 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                ddate <= :p_ddate
          allow filtering """
   ).bind()
+
+
+  val bndDdatesTicksByInter =  session.prepare(
+    """
+      select distinct ticker_id,ddate
+        from mts_src.ticks
+       where ticker_id  = :p_ticker_id and
+                 ddate <= :p_ddate_max and
+                 ddate >= :p_ddate_min
+        allow filtering
+    """).bind()
+
+  val bndAllTicksByDdate = session.prepare (
+    """
+      select db_tsunx,ask,bid
+        from mts_src.ticks
+       where ticker_id = :p_ticker_id and
+             ddate     = :p_ddate
+    """).bind()
 
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
@@ -692,6 +713,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * read all ticks for this Form ts interval. For deep micro structure analyze.
   */
+  // !!! remove it as useless !!!
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick] = {
     session.execute(bndTinyTicks
       .setInt("p_ticker_id", tickerID)
@@ -706,12 +728,46 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * Read all ticks for this tickerID and ts interval, additional less than ddateMax
     */
-  def getAllTicksForForm(tickerID :Int, tsMin :Long, tsMax :Long, ddateMax : LocalDate) :Seq[tinyTick] ={
-    //read ddate distinct and then read all ticks by this ddates.
+  def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick] ={
+   // ticker_id,ddate
+    session.execute(bndDdatesTicksByInter
+        .setInt( "p_ticker_id",tickerID)
+        .setDate("p_ddate_max",ddateMax)
+        .setDate("p_ddate_min",ddateMin))
+      .all()
+      .iterator.asScala.toSeq
+      .map(r => (r.getInt("ticker_id"),r.getDate("ddate"))).sortBy(e => e._2)
+      .collect {
+      case (tickerID :Int, ddate :LocalDate) =>
+          val seqTickOneDDate :Seq[tinyTick] =
+            session.execute(bndAllTicksByDdate
+              .setInt("p_ticker_id",tickerID)
+              .setDate("p_ddate",ddate))
+              .all().iterator.asScala.toSeq
+              .map(r => new tinyTick(
+                r.getLong("db_tsunx"),
+                r.getDouble("ask"),
+                r.getDouble("bid"))
+              )
+          logger.debug("INTERNAL READ TICKS (" + (tickerID,ddate) + ") ROWS = "+seqTickOneDDate.size+" SIZE = "+ SizeEstimator.estimate(seqTickOneDDate)/1024L/1024L+" Mb.")
+        seqTickOneDDate.sortBy(e => e.db_tsunx)
+    }.flatten.filter(elm => elm.db_tsunx >= tsMin && elm.db_tsunx <= tsMax)
   }
+  /** --------------------------------------------------------------------------------------- */
+
+  /**
+    * Save all calculated forms of bars into DB.
+  */
+  def saveForms(seqForm : Seq[bForm]) = {
+/*
+  barFa        :barsFaData,
+            formDeepKoef :Int,
+            ticksCnt     :Int
+*/
+  }
+  /** --------------------------------------------------------------------------------------- */
 
 }
-
 
 object DBCass {
   def apply(nodeAddress: String, dbType :String) = {

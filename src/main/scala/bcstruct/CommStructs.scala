@@ -204,10 +204,22 @@ case class tinyTick(
                      bid       :Double
                    )
 
-     class bForm(
-                 barFa        :barsFaData,
-                 formDeepKoef :Int,
-                 seqTicks     :Seq[tinyTick]
-                ) {
-       val tickCnt :Int  = seqTicks.size
-     }
+class bForm private(
+            barFa        :barsFaData,
+            formDeepKoef :Int,
+            ticksCnt     :Int
+           ){
+}
+
+/**
+  * We use factory method - create to make all calculation and for eleminate stogin big object -
+  * seqTicks inside bForm instances.
+*/
+object bForm {
+  def create(barFa        :barsFaData,
+             formDeepKoef :Int,
+             seqTicks     :Seq[tinyTick]):bForm = {
+    val ticksCnt = seqTicks.size
+      new bForm(barFa,formDeepKoef,ticksCnt)
+  }
+}

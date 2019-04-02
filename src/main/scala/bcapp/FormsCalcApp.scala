@@ -5,6 +5,9 @@ import org.slf4j.LoggerFactory
 
 object FormsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
+  logger.debug("PROPERTY log4j.properties = "+getClass.getClassLoader().getResource("log4j.properties"))
+
+
   val node: String = "10.241.5.234"
   val dbType: String = "cassandra"
   /**
