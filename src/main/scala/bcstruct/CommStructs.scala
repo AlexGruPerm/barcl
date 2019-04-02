@@ -204,12 +204,18 @@ case class tinyTick(
                      bid       :Double
                    )
 
-class bForm private(
-            barFa        :barsFaData,
-            formDeepKoef :Int,
-            ticksCnt     :Int
-           ){
-}
+case class bForm  (
+                    tickerId     :Int,
+                    barWidthSec  :Int,
+                    dDate        :LocalDate,
+                    TsBegin      :Long,
+                    TsEnd        :Long,
+                    prcnt        :Double,
+                    resType      :String,
+                    res          :Map[String,String],
+                    formDeepKoef :Int,
+                    FormProps    :Map[String,String]
+                  )
 
 /**
   * We use factory method - create to make all calculation and for eleminate stogin big object -
@@ -218,8 +224,23 @@ class bForm private(
 object bForm {
   def create(barFa        :barsFaData,
              formDeepKoef :Int,
-             seqTicks     :Seq[tinyTick]):bForm = {
-    val ticksCnt = seqTicks.size
-      new bForm(barFa,formDeepKoef,ticksCnt)
+             seqTicks     :Seq[tinyTick]) :bForm = {
+    val ticksCnt :Int = seqTicks.size
+    val tsBegin = seqTicks.size match {case 0 => 0L case _ => seqTicks.map(t => t.db_tsunx).min}
+    /**
+      * Here calculate any properties for FormProps.
+    */
+      new bForm(
+        barFa.tickerId,
+        barFa.barWidthSec,
+        barFa.dDate,
+        tsBegin,
+        barFa.TsEnd,
+        barFa.prcnt,
+        barFa.resType,
+        barFa.res,
+        formDeepKoef,
+        Map("ticksCnt"->ticksCnt.toString)
+      )
   }
 }

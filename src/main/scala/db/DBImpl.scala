@@ -37,7 +37,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
   def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick]
-  def saveForms(seqForm : Seq[bForm])
+  def saveForms(seqForms : Seq[bForm])
   //def getFaBarsFiltered(seqBars :Seq[barsFaData],resType :String,futureInterval :Double,groupIntervalSec :Int) :Seq[barsFaData]
 
 }
@@ -241,6 +241,36 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
        where ticker_id = :p_ticker_id and
              ddate     = :p_ddate
     """).bind()
+
+  val bndSaveForms = session.prepare(
+    """
+       insert into mts_bars.bars_forms(
+         	                             ticker_id,
+                                       bar_width_sec,
+      	                               ddate,
+                                       ts_begin,
+                                       ts_end,
+                                   	   prcnt,
+      	                               res_type,
+                                       res,
+                                       formDeepKoef,
+                                       FormProps)
+       values(
+              :p_ticker_id,
+              :p_bar_width_sec,
+              :p_ddate,
+              :p_ts_begin,
+              :p_ts_end,
+              :p_prcnt,
+              :p_res_type,
+              :p_res,
+              :p_formDeepKoef,
+              :p_FormProps
+             )
+    """)
+
+
+
 
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
@@ -758,12 +788,35 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * Save all calculated forms of bars into DB.
   */
-  def saveForms(seqForm : Seq[bForm]) = {
-/*
-  barFa        :barsFaData,
-            formDeepKoef :Int,
-            ticksCnt     :Int
-*/
+  def saveForms(seqForms : Seq[bForm]) = {
+    /*
+    for (f <- seqForms.take(10)) {
+      logger.debug("  FORM :  "+f.tickerId + " ts("+f.TsBegin+","+f.TsEnd+") ticksCnt="+f.FormProps.get("ticksCnt"))
+    }
+    */
+
+    val parts = seqForms.grouped(100)//other limit 65535 for tiny rows.
+
+    for(thisPartOfSeq <- parts) {
+      //logger.debug("INSIDE [saveBarsFutAnal] SIZE OF thisPartOfSeq = "+thisPartOfSeq.size)
+      var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
+      thisPartOfSeq.foreach {
+        t =>
+          batch.add(bndSaveForms.bind()
+            .setInt("p_ticker_id", t.tickerId)
+            .setInt("p_bar_width_sec",t.barWidthSec)
+            .setDate("p_ddate", t.dDate)
+            .setLong("p_ts_begin", t.TsBegin)
+            .setLong("p_ts_end", t.TsEnd)
+            .setDouble("p_prcnt",t.prcnt)
+            .setString("p_res_type",t.resType)
+            .setMap("p_res", t.res.asJava)
+            .setInt("p_formDeepKoef", t.formDeepKoef)
+            .setMap("p_FormProps", t.FormProps.asJava)
+          )
+      }
+      session.execute(batch)
+    }
   }
   /** --------------------------------------------------------------------------------------- */
 

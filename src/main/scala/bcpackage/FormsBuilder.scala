@@ -70,7 +70,6 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
                " tsEnd="+lb.TsEnd+" seqFormTicks.ROWS = "+
                seqFormTicks.size+" SIZE = "+ SizeEstimator.estimate(seqFormTicks)/1024L +" Kb.")
              */
-
               bForm.create(lb,formDeepKoef,seqFormTicks)
           }
           logger.debug(" =[2]======= seqForms.ROWS=["+ seqForms.size +"] SIZE =["+ SizeEstimator.estimate(seqForms)/1024L +"] Kb. ========")

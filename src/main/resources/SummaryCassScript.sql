@@ -123,7 +123,7 @@ CREATE TABLE mts_bars.bars_fa(
 	prcnt  double,
 	res_type text,
     res map<text,text>,
-	PRIMARY KEY ((ticker_id, ddate, bar_width_sec),ts_end,prcnt)
+	PRIMARY KEY ((ticker_id, ddate, bar_width_sec),ts_end, prcnt)
 ) WITH  CLUSTERING ORDER BY (ts_end DESC);
 
 
@@ -132,3 +132,17 @@ CREATE TABLE mts_bars.bars_fa(
 --
 --
 ---------------------------------------------------
+
+CREATE TABLE mts_bars.bars_forms(
+	ticker_id int,
+    bar_width_sec int,
+	ddate date,
+	ts_begin bigint,
+	ts_end   bigint,
+	prcnt  double,
+	res_type text,
+    res map<text,text>,
+    formDeepKoef int,
+    FormProps map<text,text>,
+	PRIMARY KEY ((ticker_id, ddate, bar_width_sec),ts_begin, ts_end, prcnt,res_type)
+) WITH CLUSTERING ORDER BY (ts_begin DESC, ts_end DESC);
