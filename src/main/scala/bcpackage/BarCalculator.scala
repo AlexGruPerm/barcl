@@ -25,7 +25,8 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     logger.debug("Calc property: -------------------------------------------------------------------------------------")
     logger.debug(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" +
       /*"  LASTBAR_DDATE=[" + cp.dDateBeginLastBar +*/ "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
-      cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick)
+      cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick+ " cp FIRSTTICK="+cp.tsFirstTicks)
+
     logger.debug(" First tick TS = "+cp.tsFirstTicks)
     logger.debug(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
       Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
@@ -35,7 +36,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     val allCalcProps :CalcProperties = dbInst.getAllCalcProperties
     logger.debug(" Size of all bar calculator properties is "+allCalcProps.cProps.size)
 
-    for(cp <- allCalcProps.cProps) {
+    for(cp <- allCalcProps.cProps.filter(c => c.barDeepSec==30)) {
       logCalcProp(cp)
 
       val currReadInterval :(Long,Long) = (cp.beginFrom,

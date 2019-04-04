@@ -28,13 +28,14 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def saveBars(seqBarsCalced :Seq[Bar])
   //For Bar range calculator
   def getAllBarsHistMeta : Seq[barsMeta]
-  def getAllCalcedBars(seqB :Seq[barsMeta]) : Seq[barsForFutAnalyze]
-  def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) : Seq[barsFutAnalyzeRes]
+  def getLastBarFaTSEnd(tickerID :Int, bar_width_sec :Int)  :Option[LocalDate]
+  def getAllCalcedBars(seqB :Seq[barsMeta]) :Seq[barsForFutAnalyze]
+  def makeAnalyze(seqB :Seq[barsForFutAnalyze],p: Double) :Seq[barsFutAnalyzeRes]
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB])
   // For FormsBuilder
   def getAllBarsFAMeta : Seq[barsFaMeta]
-  def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData]
-  def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)]
+  def getAllFaBars(seqB :Seq[barsFaMeta]) :Seq[barsFaData]
+  def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) :Seq[(Int,barsFaData)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
   def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick]
   def saveForms(seqForms : Seq[bForm])
@@ -85,15 +86,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def close() = session.close()
 
-  val bndBCalcProps = session.prepare(""" select * from mts_meta.bars_property """).bind()
-
-  /*
-   select ts_end
-                    from mts_bars.last_bars
-                   where ticker_id     = :tickerId and
-                         bar_width_sec = :barDeepSec
-                   limit 1 ALLOW FILTERING
-*/
+  val bndBCalcProps = session.prepare(""" select * from mts_meta.bars_property; """).bind()
 
   val lastBarMaxDdate = session.prepare(
     """ select max(ddate) as ddate from mts_bars.bars where ticker_id=:tickerId and bar_width_sec=:barDeepSec allow filtering; """).bind()
@@ -198,6 +191,12 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   val bndBarsFAMeta = session.prepare(
     """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """).bind()
+
+  val bndBarsFaLastNN = session.prepare(""" select max(ddate) as ddate
+                                                      from mts_bars.bars_fa
+                                                     where ticker_id     = :p_ticker_id and
+                                                           bar_width_sec = :p_bar_width_sec
+                                                     allow filtering; """).bind()
 
   val bndBarsFaData = session.prepare(
     """ select
@@ -341,6 +340,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         ).all().iterator.asScala.toSeq map (row => row.getDate("ddate")) filter(ld => ld != null)   ).headOption
         match {
           case Some(firstDdate) => {
+            //logger.debug("----------------- firstDdate inside firstTickTS  is = "+firstDdate)
             (session.execute(bndFirstTickTs
               .setInt("tickerId", rowCP.getInt("ticker_id"))
               .setDate("pDdate",  firstDdate)
@@ -387,9 +387,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     new barsMeta(
       row.getInt("ticker_id"),
       row.getInt("bar_width_sec"),
-      row.getDate("ddate"),
-      0L
-    )
+      row.getDate("ddate"))
   }
 
   val rowToBarData = (row :Row, tickerID :Int, barWidthSec :Int, dDate :LocalDate) => {
@@ -529,9 +527,17 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
    session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-     .filter(r =>  r.tickerId==1 /*&& r.barWidthSec==3600*/)//-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+     //.filter(r =>  r.tickerId==1 && r.barWidthSec==3600) -------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
+  }
+
+
+  def getLastBarFaTSEnd(tickerID :Int, bar_width_sec :Int) :Option[LocalDate] = {
+    Option(session.execute(bndBarsFaLastNN
+      .setInt("p_ticker_id", tickerID)
+      .setInt("p_bar_width_sec", bar_width_sec))
+      .one().getDate("ddate"))
   }
 
   /**
@@ -539,7 +545,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * Read date by date for key: ticker+bws
     *
     * */
-  def getAllCalcedBars(seqB :Seq[barsMeta]) : Seq[barsForFutAnalyze] = {
+  def getAllCalcedBars(seqB :Seq[barsMeta]) :Seq[barsForFutAnalyze] = {
     seqB.flatMap(sb => session.execute(bndBarsHistData
       .setInt("p_ticker_id", sb.tickerId)
       .setInt("p_bar_width_sec",sb.barWidthSec)
@@ -669,7 +675,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      .filter(r =>  r.tickerId==1 && r.barWidthSec==30/*3600*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+      .filter(r =>  r.tickerId==14 && r.barWidthSec==30) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }

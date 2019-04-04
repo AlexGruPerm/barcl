@@ -20,8 +20,8 @@ case class  Tick(
 
 object TicksLoader extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
-  val nodeFrom: String = "" // remote Yandex cloud (sinle instance)
-  val nodeTo: String = ""  // local 3 instance Cluster. For cluster:
+  val nodeFrom: String = "193.124.112.90" // remote Yandex cloud (single instance)
+  val nodeTo: String = "10.241.5.234"  // local 3 instance Cluster. For cluster:
 
   val sessFrom = Cluster.builder().addContactPoint(nodeFrom).build().connect()
   val sessTo = Cluster.builder().addContactPoint(nodeTo).build().connect()
@@ -53,7 +53,7 @@ object TicksLoader extends App {
 
   val sqTicksCountTotal = sessFrom.execute(bndTicksTotal)
     .all().iterator.asScala.toSeq
-    .map(r => TicksCountTotal(r.getInt("ticker_id"),r.getLong("ticks_count")))
+    .map(r => TicksCountTotal(r.getInt("ticker_id"),r.getLong("ticks_count"))).filter(elm => Seq(30,31,32,33,34,35,36,37,38).contains(elm.ticker_id))
     .sortBy(t => t.ticker_id)
 
   val sqTicksCountDays = sessFrom.execute(bndTicksCountDays)
@@ -61,7 +61,7 @@ object TicksLoader extends App {
     .map(r => TicksCountDays(r.getInt("ticker_id"),r.getDate("ddate"),r.getLong("ticks_count")))
     .sortBy(t => (t.ticker_id,t.ddate.getMillisSinceEpoch)) //sort by ticker_id AND ddate
 
-  for(elm <- sqTicksCountDays){
+  for(elm <- sqTicksCountDays.filter(elm => Seq(30,31,32,33,34,35,36,37,38).contains(elm.ticker_id))){
     val tickCntTotal = sqTicksCountTotal.filter(tct => tct.ticker_id == elm.ticker_id).head.ticks_count
     println(elm +"  TOTAL_TICKS_COUNT = "+tickCntTotal)
 

@@ -126,8 +126,7 @@ class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
 case class barsMeta(
                      tickerId    :Int,
                      barWidthSec :Int,
-                     dDate       :LocalDate,
-                     lastTsEnd   :Long
+                     dDate       :LocalDate
                    )
 
 case class barsForFutAnalyze(
@@ -204,7 +203,7 @@ case class tinyTick(
                      bid       :Double
                    )
 
-case class bForm  (
+case class   bForm(
                     tickerId     :Int,
                     barWidthSec  :Int,
                     dDate        :LocalDate,

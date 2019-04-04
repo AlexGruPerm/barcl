@@ -5,6 +5,13 @@ import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
+/*
+import bcstruct.{bForm, barsFaData, barsFaMeta, tinyTick}
+import com.madhukaraphatak.sizeof.SizeEstimator
+import db.{DBCass, DBImpl}
+import org.slf4j.LoggerFactory
+*/
+
 class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :Int, intervalNewGroupKoeff :Int) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
@@ -22,26 +29,62 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
 
 
   def calcIteration(dbInst :DBImpl) = {
-   val barsFaMeta :Seq[barsFaMeta] =  dbInst.getAllBarsFAMeta
-    logger.debug("barsFaMeta.size="+barsFaMeta.size)
+   val barsFam :Seq[barsFaMeta] =  dbInst.getAllBarsFAMeta
+    logger.debug("barsFam.size="+barsFam.size+" Distinct(tickerID,BSW).size="+barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size)
     /**
       * Read bars from mts_bars.bars_fa with iterations by (tickerId,barWidthSec)
       *  internally by each ddate.
       *  Next grouping bars (by resType and prcntsDiv) for separated groups. We need eliminate neighboring bars. And keep only last bars for each groups.
       *
     */
-    barsFaMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct
+    /*
+    for (elm <- barsFaMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct) {
+      logger.debug(elm.toString())
+    }
+    */
+    /*
+    logger.debug("barsFam.size = "+barsFam.size)
+    logger.debug("barsFaMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size = "+barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size)
+*/
+
+
+
+    barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.toList
       .collect {
         case (tickerId,barWidthSec) =>
-          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFaMeta.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
+          logger.debug("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
+          logger.debug("   ")
+          logger.debug(" FormBuilder iteration for ["+(tickerId,barWidthSec)+"] ")
+          logger.debug("   ")
+          logger.debug("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
+
+          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
           allFABarsDebugLog(tickerId,barWidthSec,allFABars)
 
           val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
             .flatMap(resType =>
+              prcntsDiv  //for optimization change allFABars.filter inside withFilter on exists/contains.
+                .withFilter(thisPercent => allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType).nonEmpty)
+                .flatMap(
+                thisPercent => (
+                  dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
+                  )
+              )
+            )
+          /*
+          val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
+            .flatMap(resType =>
               prcntsDiv.flatMap(
-               thisPercent => dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
+               thisPercent => (
+                   dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
+                 )
             )
           )
+          */
+
+
+          // на вход dbInst.filterFABars приходит пустой Seq и падает алгоритм., не передавтаь пустые Seq.
+
           //debugLastBarsOfGrp(lastBarsOfForms)
           logger.info("lastBarsOfForms ROWS="+lastBarsOfForms.size+" SIZE OF WHOLE  = "+ SizeEstimator.estimate(lastBarsOfForms)/1024L  +" Kb.")
 
@@ -75,7 +118,9 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
           logger.debug(" =[2]======= seqForms.ROWS=["+ seqForms.size +"] SIZE =["+ SizeEstimator.estimate(seqForms)/1024L +"] Kb. ========")
 
           dbInst.saveForms(seqForms)
+
     }
+
   }
 
 

@@ -1,4 +1,15 @@
+val l :Seq[Int] = Seq(1,2,4,3,5,6,9,7)
 
+val r :Seq[Int] = l.withFilter(e => e>=5)
+
+  /*
+val r :Seq[Int] = for(e <- l) yield {
+  if (e >=5)
+    (1 to e).sum
+}
+*/
+
+/*
 val l :Seq[Int] = Seq(1,2,4,3,5,6,9,7)
 val cur = l.init
 val nxt = l.tail
@@ -6,10 +17,11 @@ val nxt = l.tail
 def getCntMovingHigh (s : Seq[Int]) : (Int,Int) =
   (s.size,s.sum)
 
-
 //val cntUp =
  val cntUp   = getCntMovingHigh(cur.zip(nxt).filter{case (c,n) => (n>c)})
  val cntDown = cur.zip(nxt).filter{case (c,n) => (n<c)}.size
+*/
+
 
 /*
 
