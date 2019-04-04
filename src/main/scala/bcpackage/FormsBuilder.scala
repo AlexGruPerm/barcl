@@ -47,7 +47,20 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
     logger.debug("barsFaMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size = "+barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size)
 */
 
+/*
+-- last calculated form, as function from bar_fa (Last)
+select max(ts_end)
+from mts_bars.bars_forms
+where ticker_id=14 and
+      bar_width_sec=30 and
+      formdeepkoef=6 and
+      prcnt=0.219
+allow filtering;
 
+*/
+
+    // Излишние чтения всех mts_bars.bars_fa хотя уже какие-то из них посчитаны в mts_bars.bars_forms
+    //!!!!!!!!!!!!! оптимизировать эти лишние чтения и расчеты !!!!!!!!!!!!
 
     barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.toList
       .collect {
@@ -71,17 +84,23 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
                   )
               )
             )
-          /*
+
+  /* BCKP
+
+          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
+          allFABarsDebugLog(tickerId,barWidthSec,allFABars)
+
           val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
             .flatMap(resType =>
-              prcntsDiv.flatMap(
-               thisPercent => (
-                   dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
-                 )
+              prcntsDiv  //for optimization change allFABars.filter inside withFilter on exists/contains.
+                .withFilter(thisPercent => allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType).nonEmpty)
+                .flatMap(
+                thisPercent => (
+                  dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
+                  )
+              )
             )
-          )
-          */
-
+*/
 
           // на вход dbInst.filterFABars приходит пустой Seq и падает алгоритм., не передавтаь пустые Seq.
 
