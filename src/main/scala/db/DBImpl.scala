@@ -34,7 +34,8 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB])
   // For FormsBuilder
   def getAllBarsFAMeta : Seq[barsFaMeta]
-  def getAllFaBars(seqB :Seq[barsFaMeta]) :Seq[barsFaData]
+  def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int) :Option[(LocalDate,Long)]
+  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsFaData]
   def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) :Seq[(Int,barsFaData)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
   def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick]
@@ -192,6 +193,17 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   val bndBarsFAMeta = session.prepare(
     """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """).bind()
 
+  val bndBarsFormsMaxDdate = session.prepare(
+    """ select max(ddate)  as ddate,
+                       max(ts_end) as ts_end
+                 from mts_bars.bars_forms
+                where ticker_id     = :p_ticker_id and
+                      bar_width_sec = :p_bar_width_sec and
+                      formdeepkoef  = :p_formdeepkoef and
+                      prcnt         = :p_prcnt
+                allow filtering;
+       """).bind()
+
   val bndBarsFaLastNN = session.prepare(""" select max(ddate) as ddate
                                                       from mts_bars.bars_fa
                                                      where ticker_id     = :p_ticker_id and
@@ -209,6 +221,21 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                       bar_width_sec = :p_bar_width_sec and
                       ddate         = :p_ddate
                 allow filtering; """).bind()
+
+  val bndBarsFaDataRestTsEnd = session.prepare(
+    """ select
+ 	                    ts_end,
+                      prcnt,
+                      res_type,
+ 	                    res
+                 from mts_bars.bars_fa
+                where ticker_id     = :p_ticker_id and
+                      bar_width_sec = :p_bar_width_sec and
+                      ddate         = :p_ddate and
+                      ts_end        > :p_ts_end
+                allow filtering; """).bind()
+
+
 /**
   * may be here make double read, first determine ddate BEGIN by b_tsunx >= and second read with 2 ddates.
 */
@@ -540,6 +567,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .one().getDate("ddate"))
   }
 
+
   /**
     * Read all bars from mts_bars.bars by input filtered seqB (contains same tickerID, bar_width_sec and differnet ddates)
     * Read date by date for key: ticker+bws
@@ -675,40 +703,66 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      .filter(r =>  r.tickerId==14 && r.barWidthSec==30) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     // .filter(r =>  r.tickerId==14 && r.barWidthSec==30) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
 
   /**
+    * Read max ddate from mts_bars.bars_forms for each key ticker_id, bar_width_sec, formdeepkoef, prcnt
+    * and return minimal one.
+  */
+  def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int) :Option[(LocalDate,Long)] ={
+   val seqDdates :Seq[Option[(LocalDate,Long)]] = prcntsDiv.map(
+     pr =>  session.execute(bndBarsFormsMaxDdate
+       .setInt("p_ticker_id", tickerId)
+       .setInt("p_bar_width_sec", barWidthSec)
+       .setInt("p_formdeepkoef",formDeepKoef)
+       .setDouble("p_prcnt",pr))
+       //.one()
+       .all().iterator.asScala.toSeq.map(row => (row.getDate("ddate"),row.getLong("ts_end"))).headOption
+   )
+
+    logger.debug("(1) seqDdates = "+seqDdates.toString())
+
+    val seqNNDdates :Seq[(LocalDate,Long)] = seqDdates.collect{ case Some(d) => d }
+    logger.debug("(2) seqNNDdates = "+seqNNDdates.toString())
+
+    if (seqNNDdates.isEmpty)
+     None
+    else
+      Option(seqNNDdates.filter(elm => elm._2 == seqNNDdates.map(s => s._2).min ).head)
+  }
+
+
+  /**
     *
     * Read all data for each ddata by key: ticker_id and bws
+    * OR
+    * read just part begining from (LocalDate,Long) if something already calced in bars_forms.
     *
   */
-  def getAllFaBars(seqB :Seq[barsFaMeta]) : Seq[barsFaData] = {
-    /*
-    val oneBarForGetMeta = seqB.head
-
-    val colDef = session.execute(bndBarsFaData
-                                 .setInt("p_ticker_id", oneBarForGetMeta.tickerId)
-                                 .setInt("p_bar_width_sec",oneBarForGetMeta.barWidthSec)
-                                 .setDate("p_ddate",oneBarForGetMeta.dDate)).getColumnDefinitions
-
-    val colsBarsNames :Seq[String] = for (thisColumn <- colDef.asList().asScala
-                                          if thisColumn.getName().substring(0,5) == "res_0") yield
-      thisColumn.getName()
-
-    logger.debug(">>>>>>>>>>>>>>>   "+colsBarsNames)
-    */
-
-    seqB.flatMap(sb => session.execute(bndBarsFaData
-      .setInt("p_ticker_id", sb.tickerId)
-      .setInt("p_bar_width_sec",sb.barWidthSec)
-      .setDate("p_ddate",sb.dDate))
-      .all()
-      .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))//.flatten
-      .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd))
-    )
+  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsFaData] = {
+    minDdateTsFromBForms match {
+      case Some(minDdateTs) =>
+        seqB.filter(b => (b.dDate.getMillisSinceEpoch >= minDdateTs._1.getMillisSinceEpoch))
+          .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd
+            .setInt("p_ticker_id", sb.tickerId)
+            .setInt("p_bar_width_sec", sb.barWidthSec)
+            .setDate("p_ddate", sb.dDate)
+            .setLong("p_ts_end", minDdateTs._2))
+            .all()
+            .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+            .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
+      case None =>
+        seqB.flatMap(sb => session.execute(bndBarsFaData
+          .setInt("p_ticker_id", sb.tickerId)
+          .setInt("p_bar_width_sec", sb.barWidthSec)
+          .setDate("p_ddate", sb.dDate))
+          .all()
+          .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+          .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
+    }
   }
 
   /**

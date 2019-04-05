@@ -4,6 +4,7 @@ import bcstruct.{bForm, barsFaData, barsFaMeta, tinyTick}
 import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
+import com.datastax.driver.core.LocalDate
 
 /*
 import bcstruct.{bForm, barsFaData, barsFaMeta, tinyTick}
@@ -71,17 +72,19 @@ allow filtering;
           logger.debug("   ")
           logger.debug("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
 
-          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
+          val minDdateTsFromBForms :Option[(LocalDate,Long)] = dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef)
+          logger.debug("(3) minDdateFromBForms="+minDdateTsFromBForms)
+
+          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec),minDdateTsFromBForms)
           allFABarsDebugLog(tickerId,barWidthSec,allFABars)
 
           val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
             .flatMap(resType =>
-              prcntsDiv  //for optimization change allFABars.filter inside withFilter on exists/contains.
-                .withFilter(thisPercent => allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType).nonEmpty)
+              prcntsDiv
+                .withFilter(thisPercent => allFABars.exists(b => b.prcnt == thisPercent && b.resType == resType))
                 .flatMap(
-                thisPercent => (
+                thisPercent =>
                   dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
-                  )
               )
             )
 

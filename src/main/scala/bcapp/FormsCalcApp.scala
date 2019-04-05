@@ -24,6 +24,7 @@ object FormsCalcApp extends App {
     *  Next bar with ts_end <= (ts_end (CurrBar) + intervalNewGroupKoeff * BWS) going in this group, else next group.
   */
   val intervalNewGroupKoeff :Int = 3
+
   try {
     (new FormsBuilder(node,prcntsDiv,formDeepKoef,intervalNewGroupKoeff)).run
   } catch {
