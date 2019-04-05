@@ -703,7 +703,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-     // .filter(r =>  r.tickerId==14 && r.barWidthSec==30) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      //.filter(r =>  r.tickerId==21 && r.barWidthSec==60) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -714,13 +714,16 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   */
   def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int) :Option[(LocalDate,Long)] ={
    val seqDdates :Seq[Option[(LocalDate,Long)]] = prcntsDiv.map(
-     pr =>  session.execute(bndBarsFormsMaxDdate
-       .setInt("p_ticker_id", tickerId)
-       .setInt("p_bar_width_sec", barWidthSec)
-       .setInt("p_formdeepkoef",formDeepKoef)
-       .setDouble("p_prcnt",pr))
-       //.one()
-       .all().iterator.asScala.toSeq.map(row => (row.getDate("ddate"),row.getLong("ts_end"))).headOption
+     pr => {
+       logger.debug("INSIDE LOOP: tickerId="+tickerId+" barWidthSec="+barWidthSec+" formDeepKoef="+formDeepKoef+" pr="+pr+" ")
+       session.execute(bndBarsFormsMaxDdate
+         .setInt("p_ticker_id", tickerId)
+         .setInt("p_bar_width_sec", barWidthSec)
+         .setInt("p_formdeepkoef", formDeepKoef)
+         .setDouble("p_prcnt", pr))
+         //.one()
+         .all().iterator.asScala.toSeq.map(row => (row.getDate("ddate"), row.getLong("ts_end"))).headOption
+     }
    )
 
     logger.debug("(1) seqDdates = "+seqDdates.toString())
@@ -743,8 +746,36 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
   */
   def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsFaData] = {
+
+    val minDdateTs : (Option[LocalDate],Long) =  minDdateTsFromBForms match {
+      case Some(minDdateTs) => (Option(minDdateTs._1),minDdateTs._2)
+      case None => (Option(null),0L)
+    }
+
+    minDdateTs match {
+      case (Some(minDdate),tsEndBegin : Long) =>
+        seqB.filter(b => (b.dDate.getMillisSinceEpoch >= minDdate.getMillisSinceEpoch))
+          .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd
+            .setInt("p_ticker_id", sb.tickerId)
+            .setInt("p_bar_width_sec", sb.barWidthSec)
+            .setDate("p_ddate", sb.dDate)
+            .setLong("p_ts_end", minDdateTs._2))
+            .all()
+            .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+            .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
+      case _ =>
+        seqB.flatMap(sb => session.execute(bndBarsFaData
+          .setInt("p_ticker_id", sb.tickerId)
+          .setInt("p_bar_width_sec", sb.barWidthSec)
+          .setDate("p_ddate", sb.dDate))
+          .all()
+          .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+          .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
+    }
+
+    /*
     minDdateTsFromBForms match {
-      case Some(minDdateTs) =>
+      case Some(minDdateTs) =>{
         seqB.filter(b => (b.dDate.getMillisSinceEpoch >= minDdateTs._1.getMillisSinceEpoch))
           .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd
             .setInt("p_ticker_id", sb.tickerId)
@@ -754,6 +785,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             .all()
             .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
             .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
+    }
       case None =>
         seqB.flatMap(sb => session.execute(bndBarsFaData
           .setInt("p_ticker_id", sb.tickerId)
@@ -763,6 +795,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
           .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
           .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
     }
+    */
   }
 
   /**
