@@ -12,7 +12,7 @@ class BarRangeCalculator(nodeAddress :String, prcntsDiv: Seq[Double]) {
 
   def calcIteration(dbInst :DBImpl) = {
     val allBarsHistMeta :Seq[barsMeta] = dbInst.getAllBarsHistMeta
-    allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).filter(elm => elm._1 >=27).distinct.foreach {
+    allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.foreach {
        {//remove this breaket
         case (tickerID: Int, barWidthSec: Int) =>
         val lastFaCalcedDdate: LocalDate = dbInst.getLastBarFaTSEnd(tickerID, barWidthSec) match {

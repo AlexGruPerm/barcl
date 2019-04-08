@@ -554,7 +554,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   */
   def getAllBarsHistMeta : Seq[barsMeta] ={
    session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-     //.filter(r =>  r.tickerId==1 && r.barWidthSec==3600) -------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+     .filter(r =>  r.tickerId==1 && r.barWidthSec==600) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
      .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -831,6 +831,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   }
   /** ---------------------------------------------------------------------------------------- */
+
+
+
+
 
 
   /**

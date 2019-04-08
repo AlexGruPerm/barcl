@@ -55,6 +55,8 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
           val minDdateTsFromBForms :Option[(LocalDate,Long)] = dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef)
           logger.debug("(3) minDdateFromBForms="+minDdateTsFromBForms)
 
+          logger.debug("Distinct ddates for ("+tickerId+","+barWidthSec+") SIZE="+barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec).size)
+
           val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec),minDdateTsFromBForms)
           allFABarsDebugLog(tickerId,barWidthSec,allFABars)
 
@@ -68,33 +70,17 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
               )
             )
 
-  /* BCKP
-
-          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
-          allFABarsDebugLog(tickerId,barWidthSec,allFABars)
-
-          val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
-            .flatMap(resType =>
-              prcntsDiv  //for optimization change allFABars.filter inside withFilter on exists/contains.
-                .withFilter(thisPercent => allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType).nonEmpty)
-                .flatMap(
-                thisPercent => (
-                  dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
-                  )
-              )
-            )
-*/
-
           // на вход dbInst.filterFABars приходит пустой Seq и падает алгоритм., не передавтаь пустые Seq.
 
           //debugLastBarsOfGrp(lastBarsOfForms)
-          logger.info("lastBarsOfForms ROWS="+lastBarsOfForms.size+" SIZE OF WHOLE  = "+ SizeEstimator.estimate(lastBarsOfForms)/1024L  +" Kb.")
+          logger.info(" -!!! --     lastBarsOfForms ROWS="+lastBarsOfForms.size+" SIZE OF WHOLE  = "+ SizeEstimator.estimate(lastBarsOfForms)/1024L  +" Kb.")
 
           val firstBarOfLastBars :barsFaData = lastBarsOfForms.map(b => b._2).head
           val lastBarOfLastBars :barsFaData = lastBarsOfForms.map(b => b._2).last
-
-          logger.debug("FirstBarOfForms TS_END="+firstBarOfLastBars.TsEnd+"    LastBarOfForms TS_END="+lastBarOfLastBars.TsEnd)
-
+/*
+          logger.debug("FB TS_END="+firstBarOfLastBars.TsEnd+" FB_DDATE="+firstBarOfLastBars.dDate+
+                       " LB TS_END="+lastBarOfLastBars.TsEnd+" LB_DDATE="+lastBarOfLastBars.dDate)
+*/
           val seqFormAllTinyTicks :Seq[tinyTick] = dbInst.getAllTicksForForms(
             tickerId,
             firstBarOfLastBars.TsEnd,
@@ -103,7 +89,6 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
             lastBarOfLastBars.dDate)
 
           logger.debug(" =[1]======= seqFormAllTinyTicks.ROWS=["+ seqFormAllTinyTicks.size +"] SIZE =["+ SizeEstimator.estimate(seqFormAllTinyTicks)/1024L/1024L +"] Mb. ========")
-
 
           val seqForms : Seq[bForm] =
          lastBarsOfForms.collect {
