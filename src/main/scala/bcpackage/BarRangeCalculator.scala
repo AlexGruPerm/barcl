@@ -79,30 +79,6 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
             },
             r.resType
           ))
-/*
-        val resFSave: Seq[barsResToSaveDB] = futAnalRes.sortBy(t => t.srcBar.ts_end)
-          .map(r => new barsResToSaveDB(
-            r.srcBar.tickerId,
-            r.srcBar.dDate,
-            r.srcBar.barWidthSec,
-            r.p,
-            r.srcBar.ts_end,
-            r.resAnal match {
-              case Some(ri) => Math.round((ri.ts_end - r.srcBar.ts_end)/1000L).toInt
-              case None => 0
-            },
-            r.resAnal match {
-              case Some(ri) => ri.dDate
-              case None => null
-            },
-            r.resAnal match {
-              case Some(ri) => ri.c
-              case None => null
-            },
-            r.resType
-          ))
-
-*/
 
         val t2FS = System.currentTimeMillis
         logger.info("Duration of gathering resFSave - " + (t2FS - t1FS) + " msecs. SEND FOR SAVE ="+resFSave.size)

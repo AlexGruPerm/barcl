@@ -13,7 +13,7 @@ object FormsCalcApp extends App {
   /**
     * Fut analyze search percents, price go up or down
   */
-  val prcntsDiv : Seq[Double] = Seq(0.219/*, 0.437, 0.873*/)
+  val prcntsDiv : Seq[Double] = Seq(0.0044)
 
   /**
     * For 3600 bars deep of Form is 6 hours. For bws=30 sec - Form size = 3 min.

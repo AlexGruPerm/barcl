@@ -1,7 +1,11 @@
 
-val d:Double = 0.1266
+val currBar_c  :Double = 1.1400
+val p          :Double = 0.0044
 
-Math.exp(d)
+val cUp = (Math.exp( Math.log(currBar_c) + p)* 10000).round / 10000.toDouble
+val cDw = (Math.exp( Math.log(currBar_c) - p)* 10000).round / 10000.toDouble
+
+
 
 
 

@@ -24,8 +24,16 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
   def debugLastBarsOfGrp(lastBarsOfForms :Seq[(Int, barsResToSaveDB)]) ={
     lastBarsOfForms.collect {
       case (grpNum,bar) =>
-        logger.debug("Group=["+grpNum+"] Form_beginTS=["+(bar.ts_end - formDeepKoef*bar.barWidthSec*1000L)+"]  Bar = "+bar)
+        logger.debug("Group=["+grpNum+"] Form_beginTS=["+(bar.ts_end - formDeepKoef*bar.barWidthSec*1000L)+"]  Bar = "+bar) // - some seconds can go into weekends.
     }
+  }
+
+  def firstLog(tickerId :Int,barWidthSec :Int) = {
+    logger.debug("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
+    logger.debug("   ")
+    logger.debug(" FormBuilder iteration for [" + (tickerId, barWidthSec) + "] ")
+    logger.debug("   ")
+    logger.debug("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
   }
 
 
@@ -43,16 +51,16 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
     logger.debug("barsFaMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size = "+barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size)
    */
 
+    val seqWays :Seq[String] = Seq("mx","mn")
+
     barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.toList
       .collect {
         case (tickerId,barWidthSec) =>
-          logger.debug("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
-          logger.debug("   ")
-          logger.debug(" FormBuilder iteration for ["+(tickerId,barWidthSec)+"] ")
-          logger.debug("   ")
-          logger.debug("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
+          firstLog(tickerId,barWidthSec)
+          seqWays.collect {
+            case (wayType :String) =>
 
-          val minDdateTsFromBForms :Option[(LocalDate,Long)] = dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef)
+          val minDdateTsFromBForms :Option[(LocalDate,Long)] = dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef, wayType)
           logger.debug("(3) minDdateFromBForms="+minDdateTsFromBForms)
 
           logger.debug("Distinct ddates for ("+tickerId+","+barWidthSec+") SIZE="+barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec).size)
@@ -60,54 +68,55 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
           val allFABars: Seq[barsResToSaveDB] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec),minDdateTsFromBForms)
           allFABarsDebugLog(tickerId,barWidthSec,allFABars)
 
-          val lastBarsOfForms :Seq[(Int, barsResToSaveDB)] = Seq("mx","mn")
-            .flatMap(resType =>
+          val lastBarsOfForms :Seq[(Int, barsResToSaveDB)] =
+            /*seqWays
+            .flatMap(*/
+              //resType =>
               prcntsDiv
-                .withFilter(thisPercent => allFABars.exists(b => b.log_oe == thisPercent && b.res_type == resType))
+                .withFilter(thisPercent => allFABars.exists(b => b.log_oe == thisPercent && b.res_type == wayType))
                 .flatMap(
                 thisPercent =>
-                  dbInst.filterFABars(allFABars.filter(b => b.log_oe == thisPercent && b.res_type == resType), intervalNewGroupKoeff)
-              )
-            )
+                  dbInst.filterFABars(allFABars.filter(b => b.log_oe == thisPercent && b.res_type == wayType), intervalNewGroupKoeff)
+                )
+             // )
+            //)
 
           // на вход dbInst.filterFABars приходит пустой Seq и падает алгоритм., не передавтаь пустые Seq.
+            debugLastBarsOfGrp(lastBarsOfForms)
+            logger.info(" -!!! --     lastBarsOfForms ROWS=" + lastBarsOfForms.size + " SIZE OF WHOLE  = " + SizeEstimator.estimate(lastBarsOfForms) / 1024L + " Kb.")
 
-          //debugLastBarsOfGrp(lastBarsOfForms)
-          logger.info(" -!!! --     lastBarsOfForms ROWS="+lastBarsOfForms.size+" SIZE OF WHOLE  = "+ SizeEstimator.estimate(lastBarsOfForms)/1024L  +" Kb.")
+            val firstBarOfLastBars = lastBarsOfForms.map(b => b._2).filter(elm => elm.res_type==wayType).minBy(elm => elm.ts_end)
+            val lastBarOfLastBars = lastBarsOfForms.map(b => b._2).filter(elm => elm.res_type==wayType).maxBy(elm => elm.ts_end)
 
-          val firstBarOfLastBars  = lastBarsOfForms.map(b => b._2).head
-          val lastBarOfLastBars  = lastBarsOfForms.map(b => b._2).last
-/*
-          logger.debug("FB TS_END="+firstBarOfLastBars.TsEnd+" FB_DDATE="+firstBarOfLastBars.dDate+
-                       " LB TS_END="+lastBarOfLastBars.TsEnd+" LB_DDATE="+lastBarOfLastBars.dDate)
-*/
-          val seqFormAllTinyTicks :Seq[tinyTick] = dbInst.getAllTicksForForms(
-            tickerId,
-            firstBarOfLastBars.ts_end,
-            lastBarOfLastBars.ts_end,
-            firstBarOfLastBars.dDate,
-            lastBarOfLastBars.dDate)
+            logger.debug("getAllTicksForForms for FB TS_END=" + firstBarOfLastBars.ts_end + " FB_DDATE=" + firstBarOfLastBars.dDate +
+              " LB TS_END=" + lastBarOfLastBars.ts_end + " LB_DDATE=" + lastBarOfLastBars.dDate)
 
-          logger.debug(" =[1]======= seqFormAllTinyTicks.ROWS=["+ seqFormAllTinyTicks.size +"] SIZE =["+ SizeEstimator.estimate(seqFormAllTinyTicks)/1024L/1024L +"] Mb. ========")
+            val seqFormAllTinyTicks: Seq[tinyTick] = dbInst.getAllTicksForForms(
+              tickerId,
+              firstBarOfLastBars.ts_end,
+              lastBarOfLastBars.ts_end,
+              firstBarOfLastBars.dDate,
+              lastBarOfLastBars.dDate)
 
-          val seqForms : Seq[bForm] =
-         lastBarsOfForms.collect {
-           case (grpNum: Int, lb: barsResToSaveDB) =>
-              val seqFormTicks :Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.ts_end - formDeepKoef*lb.barWidthSec*1000L) && t.db_tsunx <= lb.ts_end)
+            logger.debug(" =[1]======= seqFormAllTinyTicks.ROWS=[" + seqFormAllTinyTicks.size + "] SIZE =[" + SizeEstimator.estimate(seqFormAllTinyTicks) / 1024L / 1024L + "] Mb. ========")
 
-             /*
+            val seqForms: Seq[bForm] =
+              lastBarsOfForms.collect {
+                case (grpNum: Int, lb: barsResToSaveDB) =>
+                  val seqFormTicks: Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.ts_end - formDeepKoef * lb.barWidthSec * 1000L) && t.db_tsunx <= lb.ts_end)
+                  /*
              logger.info(">>>  tickerId="+tickerId+" group="+grpNum+" ts_begin="+(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L)+
                " tsEnd="+lb.TsEnd+" seqFormTicks.ROWS = "+
                seqFormTicks.size+" SIZE = "+ SizeEstimator.estimate(seqFormTicks)/1024L +" Kb.")
              */
-              bForm.create(lb,formDeepKoef,seqFormTicks)
+                  bForm.create(lb, formDeepKoef, seqFormTicks)
+              }
+            logger.debug(" =[2]======= seqForms.ROWS=[" + seqForms.size + "] SIZE =[" + SizeEstimator.estimate(seqForms) / 1024L + "] Kb. ========")
+            dbInst.saveForms(seqForms.toList)
           }
-          logger.debug(" =[2]======= seqForms.ROWS=["+ seqForms.size +"] SIZE =["+ SizeEstimator.estimate(seqForms)/1024L +"] Kb. ========")
 
-          dbInst.saveForms(seqForms)
 
     }
-
   }
 
 
