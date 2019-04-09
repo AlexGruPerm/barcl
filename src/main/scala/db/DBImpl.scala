@@ -35,8 +35,8 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   // For FormsBuilder
   def getAllBarsFAMeta : Seq[barsFaMeta]
   def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int) :Option[(LocalDate,Long)]
-  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsFaData]
-  def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) :Seq[(Int,barsFaData)]
+  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsResToSaveDB]
+  def filterFABars(seqB :Seq[barsResToSaveDB], intervalNewGroupKoeff :Int) :Seq[(Int,barsResToSaveDB)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
   def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick]
   def saveForms(seqForms : Seq[bForm])
@@ -187,8 +187,36 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
          allow filtering; """).bind()
 
   val bndSaveFa =session.prepare(
+    """ insert into mts_bars.bars_fa(
+      ticker_id,
+      ddate,
+      bar_width_sec,
+      ts_end,
+      c,
+      log_oe,
+      ts_end_res,
+      dursec_res,
+      ddate_res,
+      c_res,
+      res_type)
+   values(
+       :p_ticker_id,
+       :p_ddate,
+       :p_bar_width_sec,
+       :p_ts_end,
+       :p_c,
+       :p_log_oe,
+       :p_ts_end_res,
+       :p_dursec_res,
+       :p_ddate_res,
+       :p_c_res,
+       :p_res_type
+       ) """)
+  /*
+  val bndSaveFa =session.prepare(
     """ insert into mts_bars.bars_fa(ticker_id,    ddate,    bar_width_sec,    ts_end,     prcnt,    res_type,    res )
                                       values(:p_ticker_id, :p_ddate, :p_bar_width_sec, :p_ts_end, :p_prcnt, :p_res_type, :p_res) """)
+  */
 
   val bndBarsFAMeta = session.prepare(
     """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """).bind()
@@ -200,7 +228,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                 where ticker_id     = :p_ticker_id and
                       bar_width_sec = :p_bar_width_sec and
                       formdeepkoef  = :p_formdeepkoef and
-                      prcnt         = :p_prcnt
+                      log_oe        = :p_log_oe
                 allow filtering;
        """).bind()
 
@@ -212,22 +240,30 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   val bndBarsFaData = session.prepare(
     """ select
- 	                    ts_end,
-                      prcnt,
-                      res_type,
- 	                    res
+                      ts_end,
+                      log_oe,
+                      ts_end_res,
+                      dursec_res,
+                      ddate_res,
+                      c_res,
+                      res_type
                  from mts_bars.bars_fa
                 where ticker_id     = :p_ticker_id and
                       bar_width_sec = :p_bar_width_sec and
                       ddate         = :p_ddate
                 allow filtering; """).bind()
 
+
+
   val bndBarsFaDataRestTsEnd = session.prepare(
     """ select
- 	                    ts_end,
-                      prcnt,
-                      res_type,
- 	                    res
+                       ts_end,
+                       log_oe,
+                       ts_end_res,
+                       dursec_res,
+                       ddate_res,
+                       c_res,
+                       res_type
                  from mts_bars.bars_fa
                 where ticker_id     = :p_ticker_id and
                       bar_width_sec = :p_bar_width_sec and
@@ -276,9 +312,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       	                               ddate,
                                        ts_begin,
                                        ts_end,
-                                   	   prcnt,
+                                   	   log_oe,
       	                               res_type,
-                                       res,
                                        formDeepKoef,
                                        FormProps)
        values(
@@ -287,9 +322,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
               :p_ddate,
               :p_ts_begin,
               :p_ts_end,
-              :p_prcnt,
+              :p_log_oe,
               :p_res_type,
-              :p_res,
               :p_formDeepKoef,
               :p_FormProps
              )
@@ -441,17 +475,20 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
   val rowToBarFAData = (row :Row, tickerID :Int, barWidthSec :Int, dDate :LocalDate) => {
-      new barsFaData(
+      new barsResToSaveDB(
         tickerID,
-        barWidthSec,
         dDate,
+        barWidthSec,
         row.getLong("ts_end"),
-        row.getDouble("prcnt"),
-        row.getString("res_type"),
-        row.getMap("res", classOf[String], classOf[String]).asScala.toMap
+        row.getDouble("c"),
+        row.getDouble("log_oe"),
+        row.getLong("ts_end_res"),
+        row.getInt("dursec_res"),
+        row.getDate("ddate_res"),
+        row.getDouble("c_res"),
+        row.getString("res_type")
       )
   }
-
 
   val rowToTinyTick = (row :Row) => {
     new tinyTick(
@@ -689,17 +726,19 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             .setDate("p_ddate", t.dDate)
             .setInt("p_bar_width_sec",t.barWidthSec)
             .setLong("p_ts_end", t.ts_end)
-            .setDouble("p_prcnt",t.prcnt)
-            .setString("p_res_type",t.res_type)
-            .setMap("p_res", t.res.asJava)
+            .setDouble("p_c",t.c)
+            .setDouble("p_log_oe",t.log_oe)
+            .setLong("p_ts_end_res", t.ts_end_res)
+            .setInt("p_dursec_res",t.dursec_res)
+            .setDate("p_ddate_res",t.ddate_res)
+            .setDouble("p_c_res",t.c_res)
+            .setString("p_res_type", t.res_type)
           )
       }
       session.execute(batch)
     }
   }
   /** ------------------------------------------------------- */
-
-
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
@@ -720,7 +759,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
          .setInt("p_ticker_id", tickerId)
          .setInt("p_bar_width_sec", barWidthSec)
          .setInt("p_formdeepkoef", formDeepKoef)
-         .setDouble("p_prcnt", pr))
+         .setDouble("p_log_oe", pr))
          //.one()
          .all().iterator.asScala.toSeq.map(row => (row.getDate("ddate"), row.getLong("ts_end"))).headOption
      }
@@ -745,7 +784,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * read just part begining from (LocalDate,Long) if something already calced in bars_forms.
     *
   */
-  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsFaData] = {
+  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsResToSaveDB] = {
 
     val minDdateTs : (Option[LocalDate],Long) =  minDdateTsFromBForms match {
       case Some(minDdateTs) => (Option(minDdateTs._1),minDdateTs._2)
@@ -762,7 +801,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             .setLong("p_ts_end", minDdateTs._2))
             .all()
             .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
-            .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
+            .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.ts_end)))
       case _ =>
         seqB.flatMap(sb => session.execute(bndBarsFaData
           .setInt("p_ticker_id", sb.tickerId)
@@ -770,32 +809,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
           .setDate("p_ddate", sb.dDate))
           .all()
           .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
-          .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
+          .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.ts_end)))
     }
 
-    /*
-    minDdateTsFromBForms match {
-      case Some(minDdateTs) =>{
-        seqB.filter(b => (b.dDate.getMillisSinceEpoch >= minDdateTs._1.getMillisSinceEpoch))
-          .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd
-            .setInt("p_ticker_id", sb.tickerId)
-            .setInt("p_bar_width_sec", sb.barWidthSec)
-            .setDate("p_ddate", sb.dDate)
-            .setLong("p_ts_end", minDdateTs._2))
-            .all()
-            .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
-            .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
-    }
-      case None =>
-        seqB.flatMap(sb => session.execute(bndBarsFaData
-          .setInt("p_ticker_id", sb.tickerId)
-          .setInt("p_bar_width_sec", sb.barWidthSec)
-          .setDate("p_ddate", sb.dDate))
-          .all()
-          .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
-          .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.TsEnd)))
-    }
-    */
   }
 
   /**
@@ -808,15 +824,15 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * (1,(1,2,3)) (2,(6,7,8)) (3,(11,12))  (4,(15))
     *
     */
-  def filterFABars(seqB :Seq[barsFaData], intervalNewGroupKoeff :Int) : Seq[(Int,barsFaData)] = {
+  def filterFABars(seqB :Seq[barsResToSaveDB], intervalNewGroupKoeff :Int) : Seq[(Int,barsResToSaveDB)] = {
     val groupIntervalSec = seqB.head.barWidthSec * intervalNewGroupKoeff
     val acc_bar = seqB.head
 
     /**
       * Grouping sequences of bars. Excluding neighboring bars.
     */
-    val r = seqB.tail.foldLeft(List((1,acc_bar))) ((acc :List[(Int,barsFaData)],elm :barsFaData) =>
-      if ((elm.TsEnd - acc.head._2.TsEnd)/1000L < groupIntervalSec)
+    val r = seqB.tail.foldLeft(List((1,acc_bar))) ((acc :List[(Int,barsResToSaveDB)],elm :barsResToSaveDB) =>
+      if ((elm.ts_end - acc.head._2.ts_end)/1000L < groupIntervalSec)
         ((acc.head._1, elm) :: acc)
       else
         ((acc.head._1+1, elm) :: acc)
@@ -824,10 +840,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
     r.groupBy(elm => elm._1).map(
       s => (s._1,s._2.filter(
-        e => e._2.TsEnd == (s._2.map(
-          b => b._2.TsEnd).max)
+        e => e._2.ts_end == (s._2.map(
+          b => b._2.ts_end).max)
       ))
-    ).toSeq.map(elm => elm._2).flatten.sortBy(e => e._2.TsEnd)
+    ).toSeq.map(elm => elm._2).flatten.sortBy(e => e._2.ts_end)
 
   }
   /** ---------------------------------------------------------------------------------------- */
@@ -905,9 +921,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             .setDate("p_ddate", t.dDate)
             .setLong("p_ts_begin", t.TsBegin)
             .setLong("p_ts_end", t.TsEnd)
-            .setDouble("p_prcnt",t.prcnt)
+            .setDouble("p_log_oe",t.log_oe)
             .setString("p_res_type",t.resType)
-            .setMap("p_res", t.res.asJava)
             .setInt("p_formDeepKoef", t.formDeepKoef)
             .setMap("p_FormProps", t.FormProps.asJava)
           )

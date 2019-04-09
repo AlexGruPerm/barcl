@@ -115,16 +115,21 @@ INSERT INTO mts_meta.tickers (ticker_id,ticker_code,ticker_first,ticker_seconds)
 --Results of future analyze for each bar from mts_bars.bars
 --
 ---------------------------------------------------
+
 CREATE TABLE mts_bars.bars_fa(
-	ticker_id int,
-	ddate date,
-    bar_width_sec int,
-	ts_end bigint,
-	prcnt  double,
-	res_type text,
-    res map<text,text>,
-	PRIMARY KEY ((ticker_id, ddate, bar_width_sec),ts_end, prcnt)
-) WITH  CLUSTERING ORDER BY (ts_end DESC);
+	ticker_id      int,
+	ddate          date,
+	bar_width_sec  int,
+    ts_end         bigint,
+    c              double,
+	log_oe         double,
+	ts_end_res     bigint,
+	dursec_res     int,
+    ddate_res      date,
+    c_res          double,
+	res_type       text,
+	PRIMARY KEY (( ticker_id, ddate, bar_width_sec ), log_oe, ts_end)
+) WITH CLUSTERING ORDER BY (log_oe ASC, ts_end DESC);
 
 
 ---------------------------------------------------
@@ -132,7 +137,7 @@ CREATE TABLE mts_bars.bars_fa(
 --
 --
 ---------------------------------------------------
-
+--v1
 CREATE TABLE mts_bars.bars_forms(
 	ticker_id int,
     bar_width_sec int,
@@ -146,6 +151,14 @@ CREATE TABLE mts_bars.bars_forms(
     FormProps map<text,text>,
 	PRIMARY KEY ((ticker_id, ddate, bar_width_sec),ts_begin, ts_end, prcnt,res_type)
 ) WITH CLUSTERING ORDER BY (ts_begin DESC, ts_end DESC);
+
+
+---------------------------------------------------
+--
+--
+--
+---------------------------------------------------
+
 
 INSERT INTO bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,30,1);
 INSERT INTO bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,60,1);

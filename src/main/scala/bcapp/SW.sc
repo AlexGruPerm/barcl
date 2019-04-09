@@ -1,6 +1,15 @@
+
+val d:Double = 0.1266
+
+Math.exp(d)
+
+
+
+/*
 val l :Seq[Int] = Seq(1,2,4,3,5,6,9,7)
 
 val r :Seq[Int] = l.withFilter(e => e>=5)
+*/
 
   /*
 val r :Seq[Int] = for(e <- l) yield {

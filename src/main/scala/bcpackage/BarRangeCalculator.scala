@@ -6,7 +6,7 @@ import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
-class BarRangeCalculator(nodeAddress :String, prcntsDiv: Seq[Double]) {
+class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
   val logger = LoggerFactory.getLogger(getClass.getName)
   implicit val localDateOrdering: Ordering[LocalDate] = Ordering.by(_.getDaysSinceEpoch)
 
@@ -45,9 +45,9 @@ class BarRangeCalculator(nodeAddress :String, prcntsDiv: Seq[Double]) {
         logger.debug("allBars BY [" + tickerID + "," + barWidthSec + "] SIZE = " + allBars.size + "  (" + allBars.head.ts_end + " - " + allBars.last.ts_end + ") " +
           " (" + allBars.head.dDate + " - " + allBars.last.dDate + ") SIZE=" + SizeEstimator.estimate(dbInst) + " bytes.")
 
-        val prcntsDivSize = prcntsDiv.size
+        val prcntsDivSize = logOpenExit.size
         val t1FAnal = System.currentTimeMillis
-        val futAnalRes: Seq[barsFutAnalyzeRes] = prcntsDiv.flatMap(p => dbInst.makeAnalyze(allBars, p))
+        val futAnalRes: Seq[barsFutAnalyzeRes] = logOpenExit.flatMap(p => dbInst.makeAnalyze(allBars, p))
         val t2FAnal = System.currentTimeMillis
         logger.debug("After analyze RES.size = " + futAnalRes.size + " Duration " + (t2FAnal - t1FAnal) + " msecs.")
 
@@ -56,33 +56,56 @@ class BarRangeCalculator(nodeAddress :String, prcntsDiv: Seq[Double]) {
         /**
           * Old algo when it was converted into columns of type Map.
           **/
-        /*
-        val resFSave :Seq[barsResToSaveDB] = futAnalRes.sortBy(t => t.srcBar.ts_end).sliding(prcntsDivSize, prcntsDivSize)
-          .filter(elm => elm.size == prcntsDivSize)
-          .map(intList => new barsResToSaveDB(intList)).to[collection.immutable.Seq]
-        */
+
+        val resFSave: Seq[barsResToSaveDB] = futAnalRes
+          .sortBy(t => t.srcBar.ts_end)
+          .filter(elm => elm.resAnal.isDefined)
+          .map(r => new barsResToSaveDB(
+            r.srcBar.tickerId,
+            r.srcBar.dDate,
+            r.srcBar.barWidthSec,
+            r.srcBar.ts_end,
+            r.srcBar.c,
+            r.p,
+            r.srcBar.ts_end, //we don't need None cases if we use filter(elm => elm.resAnal.isDefined)
+            r.resAnal match {
+              case Some(ri) => Math.round((ri.ts_end - r.srcBar.ts_end)/1000L).toInt
+            },
+            r.resAnal match {
+              case Some(ri) => ri.dDate
+            },
+            r.resAnal match {
+              case Some(ri) => ri.c
+            },
+            r.resType
+          ))
+/*
         val resFSave: Seq[barsResToSaveDB] = futAnalRes.sortBy(t => t.srcBar.ts_end)
           .map(r => new barsResToSaveDB(
             r.srcBar.tickerId,
-            r.srcBar.barWidthSec,
             r.srcBar.dDate,
-            r.srcBar.ts_end,
+            r.srcBar.barWidthSec,
             r.p,
-            r.resType,
-            Map(
-              "ts_end" -> (r.resAnal match {
-                case Some(ri) => ri.ts_end.toString
-                case None => ""
-              }),
-              "durSec" -> (r.resAnal match {
-                case Some(ri) => Math.round((/*  (ri.ts_end + ri.ts_begin)/2L  */ ri.ts_end - r.srcBar.ts_end) / 1000L).toString
-                case None => "0"
-              })
-            )
+            r.srcBar.ts_end,
+            r.resAnal match {
+              case Some(ri) => Math.round((ri.ts_end - r.srcBar.ts_end)/1000L).toInt
+              case None => 0
+            },
+            r.resAnal match {
+              case Some(ri) => ri.dDate
+              case None => null
+            },
+            r.resAnal match {
+              case Some(ri) => ri.c
+              case None => null
+            },
+            r.resType
           ))
 
+*/
+
         val t2FS = System.currentTimeMillis
-        logger.info("Duration of gathering resFSave - " + (t2FS - t1FS) + " msecs.")
+        logger.info("Duration of gathering resFSave - " + (t2FS - t1FS) + " msecs. SEND FOR SAVE ="+resFSave.size)
 
         val t1Save = System.currentTimeMillis
         dbInst.saveBarsFutAnal(resFSave)

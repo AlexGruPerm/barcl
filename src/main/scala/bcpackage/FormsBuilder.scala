@@ -1,6 +1,6 @@
 package bcpackage
 
-import bcstruct.{bForm, barsFaData, barsFaMeta, tinyTick}
+import bcstruct.{bForm, barsFaMeta, barsResToSaveDB, tinyTick}
 import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
@@ -16,15 +16,15 @@ import org.slf4j.LoggerFactory
 class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :Int, intervalNewGroupKoeff :Int) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
-  def  allFABarsDebugLog(tickerId :Int,barWidthSec :Int,allFABars : Seq[barsFaData] ) ={
-    logger.debug("allFABars for " + (tickerId,barWidthSec) + " SIZE " + allFABars.size + "  (" + allFABars.head.TsEnd + ") " +
+  def  allFABarsDebugLog(tickerId :Int,barWidthSec :Int,allFABars : Seq[barsResToSaveDB] ) ={
+    logger.debug("allFABars for " + (tickerId,barWidthSec) + " SIZE " + allFABars.size + "  (" + allFABars.head.ts_end + ") " +
       " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" + SizeEstimator.estimate(allFABars)/1024L/1024L + " Mb.")
   }
 
-  def debugLastBarsOfGrp(lastBarsOfForms :Seq[(Int, barsFaData)]) ={
+  def debugLastBarsOfGrp(lastBarsOfForms :Seq[(Int, barsResToSaveDB)]) ={
     lastBarsOfForms.collect {
-      case (grpNum: Int, bar: barsFaData) =>
-        logger.debug("Group=["+grpNum+"] Form_beginTS=["+(bar.TsEnd - formDeepKoef*bar.barWidthSec*1000L)+"]  Bar = "+bar)
+      case (grpNum,bar) =>
+        logger.debug("Group=["+grpNum+"] Form_beginTS=["+(bar.ts_end - formDeepKoef*bar.barWidthSec*1000L)+"]  Bar = "+bar)
     }
   }
 
@@ -35,7 +35,7 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
     /**
       * Read bars from mts_bars.bars_fa with iterations by (tickerId,barWidthSec)
       *  internally by each ddate.
-      *  Next grouping bars (by resType and prcntsDiv) for separated groups. We need eliminate neighboring bars. And keep only last bars for each groups.
+      *  Next grouping bars (by resType and logOpenExit) for separated groups. We need eliminate neighboring bars. And keep only last bars for each groups.
       *
     */
     /*
@@ -57,16 +57,16 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
 
           logger.debug("Distinct ddates for ("+tickerId+","+barWidthSec+") SIZE="+barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec).size)
 
-          val allFABars: Seq[barsFaData] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec),minDdateTsFromBForms)
+          val allFABars: Seq[barsResToSaveDB] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec),minDdateTsFromBForms)
           allFABarsDebugLog(tickerId,barWidthSec,allFABars)
 
-          val lastBarsOfForms :Seq[(Int, barsFaData)] = Seq("mx","mn")
+          val lastBarsOfForms :Seq[(Int, barsResToSaveDB)] = Seq("mx","mn")
             .flatMap(resType =>
               prcntsDiv
-                .withFilter(thisPercent => allFABars.exists(b => b.prcnt == thisPercent && b.resType == resType))
+                .withFilter(thisPercent => allFABars.exists(b => b.log_oe == thisPercent && b.res_type == resType))
                 .flatMap(
                 thisPercent =>
-                  dbInst.filterFABars(allFABars.filter(b => b.prcnt == thisPercent && b.resType == resType), intervalNewGroupKoeff)
+                  dbInst.filterFABars(allFABars.filter(b => b.log_oe == thisPercent && b.res_type == resType), intervalNewGroupKoeff)
               )
             )
 
@@ -75,16 +75,16 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
           //debugLastBarsOfGrp(lastBarsOfForms)
           logger.info(" -!!! --     lastBarsOfForms ROWS="+lastBarsOfForms.size+" SIZE OF WHOLE  = "+ SizeEstimator.estimate(lastBarsOfForms)/1024L  +" Kb.")
 
-          val firstBarOfLastBars :barsFaData = lastBarsOfForms.map(b => b._2).head
-          val lastBarOfLastBars :barsFaData = lastBarsOfForms.map(b => b._2).last
+          val firstBarOfLastBars  = lastBarsOfForms.map(b => b._2).head
+          val lastBarOfLastBars  = lastBarsOfForms.map(b => b._2).last
 /*
           logger.debug("FB TS_END="+firstBarOfLastBars.TsEnd+" FB_DDATE="+firstBarOfLastBars.dDate+
                        " LB TS_END="+lastBarOfLastBars.TsEnd+" LB_DDATE="+lastBarOfLastBars.dDate)
 */
           val seqFormAllTinyTicks :Seq[tinyTick] = dbInst.getAllTicksForForms(
             tickerId,
-            firstBarOfLastBars.TsEnd,
-            lastBarOfLastBars.TsEnd,
+            firstBarOfLastBars.ts_end,
+            lastBarOfLastBars.ts_end,
             firstBarOfLastBars.dDate,
             lastBarOfLastBars.dDate)
 
@@ -92,8 +92,8 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
 
           val seqForms : Seq[bForm] =
          lastBarsOfForms.collect {
-           case (grpNum: Int, lb: barsFaData) =>
-              val seqFormTicks :Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L) && t.db_tsunx <= lb.TsEnd)
+           case (grpNum: Int, lb: barsResToSaveDB) =>
+              val seqFormTicks :Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.ts_end - formDeepKoef*lb.barWidthSec*1000L) && t.db_tsunx <= lb.ts_end)
 
              /*
              logger.info(">>>  tickerId="+tickerId+" group="+grpNum+" ts_begin="+(lb.TsEnd - formDeepKoef*lb.barWidthSec*1000L)+

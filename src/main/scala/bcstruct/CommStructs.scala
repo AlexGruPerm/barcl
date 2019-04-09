@@ -169,15 +169,18 @@ case class barsFutAnalyzeRes(
   * -----
 */
 
-
 case class barsResToSaveDB(
-                            tickerId      :Int,
-                            barWidthSec   :Int,
-                            dDate         :LocalDate,
-                            ts_end        :Long,
-                            prcnt         :Double,
-                            res_type      :String,
-                            res           :Map[String,String]
+                            tickerId     :Int,
+                            dDate        :LocalDate,
+                            barWidthSec  :Int,
+                            ts_end       :Long,
+                            c            :Double,
+                            log_oe       :Double,
+                            ts_end_res   :Long,
+                            dursec_res   :Int,
+                            ddate_res    :LocalDate,
+                            c_res        :Double,
+                            res_type     :String
                           )
 
 case class barsFaMeta(
@@ -186,7 +189,7 @@ case class barsFaMeta(
                      dDate       :LocalDate,
                      lastTsEnd   :Long
                     )
-
+/*
 case class  barsFaData(
                        tickerId    :Int,
                        barWidthSec :Int,
@@ -196,6 +199,7 @@ case class  barsFaData(
                        resType     :String,
                        res         :Map[String,String]
                      )
+*/
 
 case class tinyTick(
                      db_tsunx  :Long,
@@ -209,9 +213,13 @@ case class   bForm(
                     dDate        :LocalDate,
                     TsBegin      :Long,
                     TsEnd        :Long,
-                    prcnt        :Double,
+                    log_oe       :Double,
                     resType      :String,
-                    res          :Map[String,String],
+                    //res          :Map[String,String],
+                    ts_end_res     :Long,
+                    dursec_res     :Int,
+                    ddate_res      :LocalDate,
+                    c_res          :Double,
                     formDeepKoef :Int,
                     FormProps    :Map[String,String]
                   )
@@ -221,7 +229,7 @@ case class   bForm(
   * seqTicks inside bForm instances.
 */
 object bForm {
-  def create(barFa        :barsFaData,
+  def create(barFa        :barsResToSaveDB,//barsFaData,
              formDeepKoef :Int,
              seqTicks     :Seq[tinyTick]) :bForm = {
     val ticksCnt :Int = seqTicks.size
@@ -234,10 +242,13 @@ object bForm {
         barFa.barWidthSec,
         barFa.dDate,
         tsBegin,
-        barFa.TsEnd,
-        barFa.prcnt,
-        barFa.resType,
-        barFa.res,
+        barFa.ts_end,
+        barFa.log_oe,
+        barFa.res_type,
+        barFa.ts_end_res,
+        barFa.dursec_res,
+        barFa.ddate_res,
+        barFa.c_res,
         formDeepKoef,
         Map("ticksCnt"->ticksCnt.toString)
       )
