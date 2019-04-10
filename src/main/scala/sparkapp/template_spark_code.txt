@@ -1,5 +1,104 @@
 /*
 
 Just small parts, queries and any for future spark application.
+Work with Map Arrays in Spark
+https://medium.com/@mrpowers/working-with-spark-arraytype-and-maptype-columns-4d85f3c8b2b3
 
 */
+
+spark-shell --total-executor-cores 3 --driver-memory 600M --executor-memory 3G --num-executors 1 --executor-cores 2 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --conf "spark.cassandra.connection.host=192.168.122.192"
+
+import org.apache.spark.sql._
+import org.apache.spark.sql.cassandra._
+import com.datastax.spark.connector._
+import org.apache.spark.sql.types.DecimalType
+import org.apache.spark.sql.functions.map_keys
+
+val df_forms_src = spark.read.format("org.apache.spark.sql.cassandra").options(Map("table"->"bars_forms","keyspace"->"mts_bars")).load().cache()
+
+scala> df_forms_src.printSchema()
+root
+ |-- ticker_id: integer (nullable = true)
+ |-- ddate: date (nullable = true)
+ |-- bar_width_sec: integer (nullable = true)
+ |-- ts_begin: long (nullable = true)
+ |-- ts_end: long (nullable = true)
+ |-- log_oe: double (nullable = true)
+ |-- res_type: string (nullable = true)
+ |-- formdeepkoef: integer (nullable = true)
+ |-- formprops: map (nullable = true)
+ |    |-- key: string
+ |    |-- value: string (valueContainsNull = true)
+
+
+case class Form(ticker_id     :Int,
+                bar_width_sec :Int,
+                log_oe        :Double,
+                res_type      :String,
+                formdeepkoef  :Int,
+                frmConfPeak   :Int)
+
+                .select($"formprops[frmConfPeak]".alias("frmConfPeak"))
+                .as[Form]
+
+ def getFormsDb(TickerID :Int, BarWidthSec: Int) = {
+            import org.apache.spark.sql.functions._
+            spark.read.format("org.apache.spark.sql.cassandra")
+              .options(Map("table" -> "bars_forms", "keyspace" -> "mts_bars"))
+              .load()
+              .where(col("ticker_id") === TickerID)
+              .where(col("bar_width_sec") === BarWidthSec)
+              .select(
+                col("ticker_id"),
+                col("bar_width_sec"),
+                col("log_oe"),
+                col("res_type"),
+                col("formdeepkoef"),
+                col("formprops")("frmConfPeak")
+                )
+                }
+
+val frm1 = getFormsDb(1,600)
+frm1.show()
+
+org.apache.spark.sql.AnalysisException: cannot resolve '`formprops`' given input columns: [bar_width_sec, formdeepkoef, ticker_id, log_oe, formprops[frmConfPeak], res_type];
+
+
+
+
+
+
+
+
+
+
+val keysDF = df_forms_src.select(map_keys($"formprops"))
+
+val dfForms1 = df_forms_src.map(row =>(row: @unchecked) Form(row.ticker_id, row.bar_width_sec, row.log_oe, row.res_type, row.formdeepkoef, row.frmConfPeak.map_keys($"frmConfPeak")))
+
+
+
+
+
+
+
+ val dat = df_tdata.filter(df_tdata("ddate") === "20180601").cache()
+ val dat_norm_1 = dat.withColumn("svalTmp", dat("sval").cast(DoubleType)).drop("sval").withColumnRenamed("svalTmp","sval")
+
+
+ case class rowData(ddate: Int,id_pok: Int,id_row: String, sval: BigDecimal)
+
+ val df_tdata_ds = spark.read.format("org.apache.spark.sql.cassandra").options(Map("table"->"t_data","keyspace"->"msk_arm_lead")).load()
+                   .filter($"ddate" === "20180601")
+                   .withColumn("sval",$"sval".cast(DecimalType(38,18)))
+                   .as[rowData]
+
+val dat = spark.read.format("org.apache.spark.sql.cassandra").options(Map("table"->"t_data","keyspace"->"msk_arm_lead"))
+.load().filter($"ddate" === "20180601").withColumn("sval",$"sval".cast(DecimalType(38,18))).as[rowData]
+
+dat: org.apache.spark.sql.Dataset[rowData] = [ddate: int, id_pok: int ... 2 more fields]
+
+case class rowNewData(ddate: Int,id_pok: Int,id_row: String, sval: BigDecimal, cntrlParam: Int)
+
+val new_dat = dat.map { row =>(row: @unchecked) match {case rowData => rowNewData(row.ddate, row.id_pok, row.id_row, row.sval, {if (row.sval>65000.0) 1 else 0} )}}
+
