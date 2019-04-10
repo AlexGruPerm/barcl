@@ -234,6 +234,30 @@ object bForm {
              seqTicks     :Seq[tinyTick]) :bForm = {
     val ticksCnt :Int = seqTicks.size
     val tsBegin = seqTicks.size match {case 0 => 0L case _ => seqTicks.map(t => t.db_tsunx).min}
+
+    /**
+      * Calculate form configuration.
+      * Basic grid:
+      * c_begin  peak_pos  c_end
+      * 1         1        1
+      * 2         2        2
+      * 3         3        3
+      *
+      * If form begins with high c and then peak exists in down part and then c going up.
+      * We can get (131)
+      * There are possible 27 distinct values.
+      * Plus: (000) if form width in seconds less < than 5*bws = (formDeepKoef-1)*bws
+      * and Plus 9 values if we can determine peak position.
+      * then possible (1,0,1),(1,0,2) etc.
+      */
+    val frmConfPeak :Int = {
+      // Check that real seq width in seconds no less than contol limit.
+      if ((seqTicks.maxBy(_.db_tsunx).db_tsunx - seqTicks.minBy(_.db_tsunx).db_tsunx)/1000L < (formDeepKoef-1)*barFa.barWidthSec) 0
+      else {
+        123
+      }
+    }
+
     /**
       * Here calculate any properties for FormProps.
     */
@@ -250,7 +274,9 @@ object bForm {
         barFa.ddate_res,
         barFa.c_res,
         formDeepKoef,
-        Map("ticksCnt"->ticksCnt.toString)
+        Map(
+          "ticksCnt"->ticksCnt.toString,
+          "frmConfPeak"->frmConfPeak.toString)
       )
   }
 }
