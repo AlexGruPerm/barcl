@@ -1,13 +1,47 @@
 
+case class tinyTick(db_tsunx  :Long,
+                    ask       :Double)
+val seqTicks = Seq(
+  tinyTick(1,20),  tinyTick(2,21),  tinyTick(3,22),  tinyTick(4,22),  tinyTick(5,21),
+  tinyTick(6,22),  tinyTick(7,21),  tinyTick(8,24),  tinyTick(9,25),  tinyTick(10,27),
+  tinyTick(11,25),  tinyTick(12,24),  tinyTick(13,23),  tinyTick(14,22),  tinyTick(15,21),
+  tinyTick(16,22),  tinyTick(17,23),  tinyTick(18,25),  tinyTick(29,27),  tinyTick(20,28),
+  tinyTick(21,30))
+
+val formCMin = seqTicks.map(_.ask).min          // total min price
+val formCMax = seqTicks.map(_.ask).max          // total max price
+val n = 10
+val rngCStep = (formCMax-formCMin)/n
+
+val rngC = formCMin.to(formCMax).by(rngCStep)
+val rangesC = rngC.zip(rngC.tail)
+
+val rangeFreq :Seq[(Double,Int)] = rangesC.map(rng =>
+  (rng._1, seqTicks.count(t => t.ask >= rng._1 && t.ask <= rng._2)))
+
+for (r <- rangeFreq) println(r)
+
+rangeFreq.maxBy(r => r._2)._1
+
+/*
+
+(21.5,5)
+(22.0,5)
+
+(21.0,8)
+(22.0,8)
+
+*/
+
+
+
+/*
 val currBar_c  :Double = 1.1400
 val p          :Double = 0.0044
 
 val cUp = (Math.exp( Math.log(currBar_c) + p)* 10000).round / 10000.toDouble
 val cDw = (Math.exp( Math.log(currBar_c) - p)* 10000).round / 10000.toDouble
-
-
-
-
+*/
 
 /*
 val l :Seq[Int] = Seq(1,2,4,3,5,6,9,7)

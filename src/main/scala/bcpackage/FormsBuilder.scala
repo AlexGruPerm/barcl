@@ -104,7 +104,6 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
 
       }
 
-
   }
 
 

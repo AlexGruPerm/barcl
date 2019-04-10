@@ -1,0 +1,5 @@
+/*
+
+Just small parts, queries and any for future spark application.
+
+*/
