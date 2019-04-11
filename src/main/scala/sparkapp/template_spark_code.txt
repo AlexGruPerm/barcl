@@ -14,6 +14,7 @@ spark-shell --total-executor-cores 3 --driver-memory 600M --executor-memory 3G -
 import org.apache.spark.sql._
 import org.apache.spark.sql.cassandra._
 import com.datastax.spark.connector._
+import spark.implicits._
 
 //===================================================================================================
 
@@ -28,6 +29,11 @@ case class Form(ticker_id     :Int,
                 res_type      :String,
                 formdeepkoef  :Int,
                 frmConfPeak   :Int)
+
+case class ccLibSvm(label    :Int,
+                    features :Int)
+
+
 /**
 *  without as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.DataFrame
 *     with as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.Dataset[Form]
@@ -67,14 +73,135 @@ dsKeys.show()
                 col("formprops")("frmConfPeak").as("frmConfPeak").cast("Int")
                 ).sort(asc("ticker_id"),asc("bar_width_sec"),asc("ts_begin")).as[Form]}
 
-//loop by dsKeys and read by KEY : ticker_id + bws
-
-val seqDsForms :Seq[Dataset[Form]] = Seq((1,600),(3,600)).map(elm => getFormsDb(elm._1,elm._2))
+val seqDsForms :Seq[Dataset[Form]] = dsKeys.collect.toSeq.map(elm => getFormsDb(elm.ticker_id,elm.bar_width_sec))
 val ds :Dataset[Form] = seqDsForms.reduce(_ union _)
+ds.cache()
+ds.count()
+spark.catalog.dropGlobalTempView("frms")
+ds.createGlobalTempView("frms")
+
+spark.sql("""
+             select res_type,frmConfPeak
+               from global_temp.frms
+""").show()
+
+/*
+libsvm package implements Spark SQL data source API for loading LIBSVM data as DataFrame.
+The loaded DataFrame has two columns:
+label containing labels stored as doubles and
+features containing feature vectors stored as Vectors.
+
+label index1:value1 index2:value2
+where the indices are one-based and in ascending order.
+
+VectorAssembler is a transformer that combines a given list of columns into a single vector column.
+
+spark.read.format("libsvm").option("numFeatures", "2").load("/root/sample_data.txt")
+data: org.apache.spark.sql.DataFrame = [label: double, features: vector]  >> !!!!!!!!
+*/
+
+val mlsrc = ds.withColumn("label",
+   when($"res_type" === "mx", 1).otherwise(
+    when($"res_type" === "mn", 0).otherwise(2))).select(col("label"),col("frmConfPeak").as("features"))
+
+import org.apache.spark.sql.types.{DoubleType}
+
+val mlsrc = ds.withColumn("label",
+   when($"res_type" === "mx", 1).otherwise(
+    when($"res_type" === "mn", 0).otherwise(2))).
+     select(
+      col("label").cast(DoubleType),
+      col("ticker_id"),
+      col("frmConfPeak")
+     )
+
+import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.ml.linalg.Vectors
+
+val assembler = new VectorAssembler().setInputCols(Array("ticker_id", "frmConfPeak" )).setOutputCol("features")
+val vd = assembler.transform(mlsrc).drop("ticker_id").drop("frmConfPeak")
+
+>>>
+like libsvm
+vd: org.apache.spark.sql.DataFrame = [label: double, features: vector]
+>>>
+
+import org.apache.spark.ml.classification.MultilayerPerceptronClassifier
+import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
+
+val data = vd
+val splits = data.randomSplit(Array(0.6, 0.4), seed = 1234L)
+val train = splits(0)
+val test = splits(1)
+println(" rows:"+data.count()+" train:"+train.count()+" test:"+test.count())
+
+val layers = Array[Int](2, 5, 5, 10)
+val trainer = new MultilayerPerceptronClassifier().setLayers(layers).setLabelCol("label").setFeaturesCol("features").setBlockSize(128).setSeed(1234L).setMaxIter(1000)
+val model = trainer.fit(train) //we can save it for future use
+
+val result = model.transform(test)
+result.show()
 
 
 
-// OR
+
+/*
+
+Convert dataset rowis into CC type
+val dat = mlsrc.map(r => ccLibSvm(r.getAs[Int]("label"),r.getAs[Int]("features")))
+
+import org.apache.spark.sql.types.IntegerType
+val df2 = df.withColumn("yearTmp", df.year.cast(IntegerType))
+    .drop("year")
+    .withColumnRenamed("yearTmp", "year")
+
+val assembler = new VectorAssembler().setInputCols(Array("TIR", "UO", "ROC20" )).setOutputCol("FEATURES")
+val vd = assembler.transform(dat)
+
+scala> mlsrc.printSchema()
+root
+ |-- label: decimal(38,18) (nullable = true)
+ |-- features: integer (nullable = true)
+
+
+
+//next we can use frms in Spark.sql
+
+//#1 Query - count of forms by ticker
+spark.sql("""
+             select ticker_id,
+                    count(*) as forms_cnt
+               from global_temp.frms
+               group by ticker_id
+              order by 2 desc
+""").show(50)
+
+//#2 Query - count of rows by groups : frmConfPeak,res_type
+spark.sql("""
+             select frmConfPeak,res_type,count(*) as forms_cnt
+               from global_temp.frms
+               group by frmConfPeak,res_type
+              order by 2,3 desc
+""").show(50)
+
+spark.sql("""
+             select frmConfPeak,res_type,count(*) as forms_cnt
+               from global_temp.frms
+               group by frmConfPeak,res_type
+              order by 1,2,3
+""").show(50)
+
+spark.sql("""
+             select frmConfPeak,count(*) as forms_cnt
+               from global_temp.frms
+               group by frmConfPeak
+              order by 2,1
+""").show(50)
+
+====================== CLUSTERING KMEANS ======================
+
+//source data : metrics.
+
 
 val ds_frm_1_600 = getFormsDb(1,600)
 val ds_frm_3_600 = getFormsDb(3,600)
@@ -127,13 +254,6 @@ unuseful incorrect forms with small deep.
 |        1|          600|1549891112686|1549894712628|  11-02-2019|        3599.942|
 |        1|          600|1549891113270|1549894712628|  11-02-2019|        3599.358|
 +---------+-------------+-------------+-------------+------------+----------------+
-
-
-
-
-
-
-/**
 
 //convert it into scala collection
 val ora_parts_list = df_ora_parts_names.as[(String)].collect.toSeq
