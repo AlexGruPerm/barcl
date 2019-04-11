@@ -4,6 +4,9 @@ Just small parts, queries and any for future spark application.
 Work with Map Arrays in Spark
 https://medium.com/@mrpowers/working-with-spark-arraytype-and-maptype-columns-4d85f3c8b2b3
 
+ETL workflow
+https://medium.com/@mrpowers/how-to-write-spark-etl-processes-df01b0c1bec9
+
 */
 
 spark-shell --total-executor-cores 3 --driver-memory 600M --executor-memory 3G --num-executors 1 --executor-cores 2 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --conf "spark.cassandra.connection.host=192.168.122.192"
@@ -11,37 +14,42 @@ spark-shell --total-executor-cores 3 --driver-memory 600M --executor-memory 3G -
 import org.apache.spark.sql._
 import org.apache.spark.sql.cassandra._
 import com.datastax.spark.connector._
-import org.apache.spark.sql.types.DecimalType
-import org.apache.spark.sql.functions.map_keys
 
-val df_forms_src = spark.read.format("org.apache.spark.sql.cassandra").options(Map("table"->"bars_forms","keyspace"->"mts_bars")).load().cache()
+//===================================================================================================
 
-scala> df_forms_src.printSchema()
-root
- |-- ticker_id: integer (nullable = true)
- |-- ddate: date (nullable = true)
- |-- bar_width_sec: integer (nullable = true)
- |-- ts_begin: long (nullable = true)
- |-- ts_end: long (nullable = true)
- |-- log_oe: double (nullable = true)
- |-- res_type: string (nullable = true)
- |-- formdeepkoef: integer (nullable = true)
- |-- formprops: map (nullable = true)
- |    |-- key: string
- |    |-- value: string (valueContainsNull = true)
-
+case class FormKeys(ticker_id     :Int,
+                    bar_width_sec :Int)
 
 case class Form(ticker_id     :Int,
                 bar_width_sec :Int,
+                ts_begin      :Long,
+                ts_end        :Long,
                 log_oe        :Double,
                 res_type      :String,
                 formdeepkoef  :Int,
                 frmConfPeak   :Int)
+/**
+*  without as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.DataFrame
+*     with as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.Dataset[Form]
+*/
 
-                .select($"formprops[frmConfPeak]".alias("frmConfPeak"))
-                .as[Form]
 
- def getFormsDb(TickerID :Int, BarWidthSec: Int) = {
+ def getKeysFormsDb(BarWidthSec: Int) :Dataset[FormKeys] = {
+            import org.apache.spark.sql.functions._
+            spark.read.format("org.apache.spark.sql.cassandra")
+              .options(Map("table" -> "bars_forms", "keyspace" -> "mts_bars"))
+              .load()
+              .where(col("bar_width_sec") === BarWidthSec)
+              .select(
+                col("ticker_id"),
+                col("bar_width_sec")
+                ).distinct.sort(asc("ticker_id"),asc("bar_width_sec")).as[FormKeys]}
+
+val dsKeys = getKeysFormsDb(600);
+
+dsKeys.show()
+
+ def getFormsDb(TickerID :Int, BarWidthSec: Int) :Dataset[Form] = {
             import org.apache.spark.sql.functions._
             spark.read.format("org.apache.spark.sql.cassandra")
               .options(Map("table" -> "bars_forms", "keyspace" -> "mts_bars"))
@@ -51,36 +59,140 @@ case class Form(ticker_id     :Int,
               .select(
                 col("ticker_id"),
                 col("bar_width_sec"),
+                col("ts_begin"),
+                col("ts_end"),
                 col("log_oe"),
                 col("res_type"),
                 col("formdeepkoef"),
-                col("formprops")("frmConfPeak")
-                )
-                }
+                col("formprops")("frmConfPeak").as("frmConfPeak").cast("Int")
+                ).sort(asc("ticker_id"),asc("bar_width_sec"),asc("ts_begin")).as[Form]}
 
-val frm1 = getFormsDb(1,600)
-frm1.show()
+//loop by dsKeys and read by KEY : ticker_id + bws
 
-org.apache.spark.sql.AnalysisException: cannot resolve '`formprops`' given input columns: [bar_width_sec, formdeepkoef, ticker_id, log_oe, formprops[frmConfPeak], res_type];
-
+val seqDsForms :Seq[Dataset[Form]] = Seq((1,600),(3,600)).map(elm => getFormsDb(elm._1,elm._2))
+val ds :Dataset[Form] = seqDsForms.reduce(_ union _)
 
 
 
+// OR
+
+val ds_frm_1_600 = getFormsDb(1,600)
+val ds_frm_3_600 = getFormsDb(3,600)
+
+val dsFrms = ds_frm_1_600.union(ds_frm_3_600)
+
+spark.catalog.dropGlobalTempView("fsrc")
+dsFrms.createGlobalTempView("fsrc")
+
+spark.sql("""
+             select count(*) as cnt
+               from global_temp.fsrc
+""").show()
+
+spark.sql("""
+             select
+                    ticker_id,
+                    bar_width_sec,
+                    ts_begin,
+                    ts_end,
+                    from_unixtime(ts_end/1000,'dd-MM-YYYY')  as ts_end_ddate,
+                    (ts_end-ts_begin)/1000                   as ts_eb_secs
+               from global_temp.fsrc
+              order by ts_begin asc
+""").show()
+
+unuseful incorrect forms with small deep.
+
++---------+-------------+-------------+-------------+------------+----------------+
+|ticker_id|bar_width_sec|     ts_begin|       ts_end|ts_end_ddate|      ts_eb_secs|
++---------+-------------+-------------+-------------+------------+----------------+
+|        3|          600|            0|1549290516164|  04-02-2019|1.549290516164E9|
+|        3|          600|1549290516164|1549290516164|  04-02-2019|             0.0|
+|        3|          600|1549290516164|1549291103752|  04-02-2019|         587.588|
+|        3|          600|1549290516189|1549291103752|  04-02-2019|         587.563|
+|        3|          600|1549522692203|1549526292016|  07-02-2019|        3599.813|
+|        3|          600|1549522692259|1549526292016|  07-02-2019|        3599.757|
+|        3|          600|1549525692122|1549529291869|  07-02-2019|        3599.747|
+|        3|          600|1549525692268|1549529291869|  07-02-2019|        3599.601|
+|        3|          600|1549526292182|1549529892062|  07-02-2019|         3599.88|
+|        3|          600|1549526293633|1549529892062|  07-02-2019|        3598.429|
+|        3|          600|1549542492949|1549546092279|  07-02-2019|         3599.33|
+|        3|          600|1549542495085|1549546092279|  07-02-2019|        3597.194|
+|        1|          600|1549659600332|1549663200271|  08-02-2019|        3599.939|
+|        3|          600|1549659600332|1549663200329|  08-02-2019|        3599.997|
+|        1|          600|1549659601334|1549663200271|  08-02-2019|        3598.937|
+|        3|          600|1549659601334|1549663200329|  08-02-2019|        3598.995|
+|        3|          600|1549890473388|1549894073354|  11-02-2019|        3599.966|
+|        3|          600|1549890473412|1549894073354|  11-02-2019|        3599.942|
+|        1|          600|1549891112686|1549894712628|  11-02-2019|        3599.942|
+|        1|          600|1549891113270|1549894712628|  11-02-2019|        3599.358|
++---------+-------------+-------------+-------------+------------+----------------+
 
 
 
 
 
 
-val keysDF = df_forms_src.select(map_keys($"formprops"))
+/**
 
-val dfForms1 = df_forms_src.map(row =>(row: @unchecked) Form(row.ticker_id, row.bar_width_sec, row.log_oe, row.res_type, row.formdeepkoef, row.frmConfPeak.map_keys($"frmConfPeak")))
+//convert it into scala collection
+val ora_parts_list = df_ora_parts_names.as[(String)].collect.toSeq
+
+for (ora_part_name <- ora_parts_list){
+ println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+ println("        Processing partition:   "+ora_part_name)
+ println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+dsFrms.count()
+
+df_forms_src.show()
+df_forms_src.printSchema()
+Dataset<Row> ds3 = ds1.union(ds2);
+
+
+scala> df_forms_src.printSchema()
+root
+ |-- ticker_id: integer (nullable = true)
+ |-- bar_width_sec: integer (nullable = true)
+ |-- ts_begin: long (nullable = true)
+ |-- ts_end: long (nullable = true)
+ |-- log_oe: double (nullable = true)
+ |-- res_type: string (nullable = true)
+ |-- formdeepkoef: integer (nullable = true)
+ |-- frmConfPeak: integer (nullable = true)
+
+*/
 
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+DIFF
 
  val dat = df_tdata.filter(df_tdata("ddate") === "20180601").cache()
  val dat_norm_1 = dat.withColumn("svalTmp", dat("sval").cast(DoubleType)).drop("sval").withColumnRenamed("svalTmp","sval")
@@ -102,3 +214,4 @@ case class rowNewData(ddate: Int,id_pok: Int,id_row: String, sval: BigDecimal, c
 
 val new_dat = dat.map { row =>(row: @unchecked) match {case rowData => rowNewData(row.ddate, row.id_pok, row.id_row, row.sval, {if (row.sval>65000.0) 1 else 0} )}}
 
+*/

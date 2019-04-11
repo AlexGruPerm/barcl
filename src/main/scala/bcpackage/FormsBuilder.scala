@@ -95,12 +95,12 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
 
           val seqForms: Seq[bForm] =
             lastBarsOfForms.collect {
-              case (grpNum: Int, lb: barsResToSaveDB) =>
+              case (grpNum: Int, lb: barsResToSaveDB)  =>
                 val seqFormTicks: Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.ts_end - formDeepKoef * lb.barWidthSec * 1000L) && t.db_tsunx <= lb.ts_end)
                 bForm.create(lb, formDeepKoef, seqFormTicks)
             }
           logger.debug(" =[2]======= seqForms.ROWS=[" + seqForms.size + "] SIZE =[" + SizeEstimator.estimate(seqForms) / 1024L + "] Kb. ========")
-          dbInst.saveForms(seqForms.toList)
+          dbInst.saveForms(seqForms.toList.filter(elm => (elm.TsBegin!=0L && (elm.TsEnd-elm.TsBegin)/1000L >= (elm.formDeepKoef-1)*elm.barWidthSec)))
 
       }
 
