@@ -383,3 +383,18 @@ INSERT INTO bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,1800,1
 INSERT INTO bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,3600,1);
 
 
+CREATE KEYSPACE mts_ml
+WITH durable_writes = true
+AND replication = {
+	'class' : 'SimpleStrategy',
+	'replication_factor' : 3
+}
+
+create table mts_ml.result(
+ label       double,
+ prediction  double,
+ p0          double,
+ p1          double,
+ formprops   int,
+ PRIMARY KEY (label, prediction, p0, p1, formprops)
+)

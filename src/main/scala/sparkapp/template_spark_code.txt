@@ -7,16 +7,70 @@ https://medium.com/@mrpowers/working-with-spark-arraytype-and-maptype-columns-4d
 ETL workflow
 https://medium.com/@mrpowers/how-to-write-spark-etl-processes-df01b0c1bec9
 
+libsvm package implements Spark SQL data source API for loading LIBSVM data as DataFrame.
+The loaded DataFrame has two columns:
+label containing labels stored as doubles and
+features containing feature vectors stored as Vectors.
+
+label index1:value1 index2:value2
+where the indices are one-based and in ascending order.
+
+VectorAssembler is a transformer that combines a given list of columns into a single vector column.
+
+spark.read.format("libsvm").option("numFeatures", "2").load("/root/sample_data.txt")
+data: org.apache.spark.sql.DataFrame = [label: double, features: vector]  >> !!!!!!!!
+
+like libsvm
+vd: org.apache.spark.sql.DataFrame = [label: double, features: vector]
+
+
+  without as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.DataFrame
+     with as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.Dataset[Form]
+
+
+import org.apache.spark.ml.feature.SQLTransformer
+
+val df = spark.createDataFrame(
+  Seq((0, 1.0, 3.0), (2, 2.0, 5.0))).toDF("id", "v1", "v2")
+
+val sqlTrans = new SQLTransformer().setStatement(
+  "SELECT *, (v1 + v2) AS v3, (v1 * v2) AS v4 FROM __THIS__")
+
+sqlTrans.transform(df).show()
+
+
+
+v1.0
+val mlsrc = ds.withColumn("label",
+   when($"res_type" === "mx", 1).otherwise(
+    when($"res_type" === "mn", 0).otherwise(2))).
+     select(
+      col("label").cast(DoubleType),
+      col("ticker_id"),
+      col("frmConfPeak")
+     )
+
+
+val seqDsForms :Seq[Dataset[Form]] = dsKeys.collect.toSeq.filter(elm => Seq(1,2,3,4,5,6).contains(elm.ticker_id)).map(elm => getFormsDb(elm.ticker_id,elm.bar_width_sec))
+
 */
 
-spark-shell --total-executor-cores 3 --driver-memory 600M --executor-memory 3G --num-executors 1 --executor-cores 2 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --conf "spark.cassandra.connection.host=192.168.122.192"
+
+--===========================================================================================================================================
+
+spark-shell --driver-memory 3G --executor-memory 5G  --executor-cores 1 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --conf "spark.cassandra.connection.host=192.168.122.192"
 
 import org.apache.spark.sql._
+import org.apache.spark.sql.functions.round
 import org.apache.spark.sql.cassandra._
 import com.datastax.spark.connector._
+import org.apache.spark.sql.types.{DoubleType}
+import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.ml.linalg.DenseVector
+import org.apache.spark.ml.classification.MultilayerPerceptronClassifier
+import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import spark.implicits._
-
-//===================================================================================================
 
 case class FormKeys(ticker_id     :Int,
                     bar_width_sec :Int)
@@ -32,13 +86,6 @@ case class Form(ticker_id     :Int,
 
 case class ccLibSvm(label    :Int,
                     features :Int)
-
-
-/**
-*  without as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.DataFrame
-*     with as[Form] getFormsDb: (TickerID: Int, BarWidthSec: Int)org.apache.spark.sql.Dataset[Form]
-*/
-
 
  def getKeysFormsDb(BarWidthSec: Int) :Dataset[FormKeys] = {
             import org.apache.spark.sql.functions._
@@ -77,70 +124,242 @@ val seqDsForms :Seq[Dataset[Form]] = dsKeys.collect.toSeq.map(elm => getFormsDb(
 val ds :Dataset[Form] = seqDsForms.reduce(_ union _)
 ds.cache()
 ds.count()
+
 spark.catalog.dropGlobalTempView("frms")
 ds.createGlobalTempView("frms")
 
-spark.sql("""
-             select res_type,frmConfPeak
-               from global_temp.frms
-""").show()
-
-/*
-libsvm package implements Spark SQL data source API for loading LIBSVM data as DataFrame.
-The loaded DataFrame has two columns:
-label containing labels stored as doubles and
-features containing feature vectors stored as Vectors.
-
-label index1:value1 index2:value2
-where the indices are one-based and in ascending order.
-
-VectorAssembler is a transformer that combines a given list of columns into a single vector column.
-
-spark.read.format("libsvm").option("numFeatures", "2").load("/root/sample_data.txt")
-data: org.apache.spark.sql.DataFrame = [label: double, features: vector]  >> !!!!!!!!
-*/
+spark.sql("""select res_type,frmConfPeak from global_temp.frms """).show()
 
 val mlsrc = ds.withColumn("label",
    when($"res_type" === "mx", 1).otherwise(
-    when($"res_type" === "mn", 0).otherwise(2))).select(col("label"),col("frmConfPeak").as("features"))
-
-import org.apache.spark.sql.types.{DoubleType}
-
-val mlsrc = ds.withColumn("label",
-   when($"res_type" === "mx", 1).otherwise(
-    when($"res_type" === "mn", 0).otherwise(2))).
+    when($"res_type" === "mn", 2).otherwise(3))).
      select(
       col("label").cast(DoubleType),
-      col("ticker_id"),
       col("frmConfPeak")
-     )
+     ).withColumn("f1", round(col("frmConfPeak")/100)).withColumn("f2", round((col("frmConfPeak") - round(col("frmConfPeak")/100)*100)/10)).withColumn("f3", col("frmConfPeak") % 10).drop("frmConfPeak")
 
-import org.apache.spark.ml.feature.VectorAssembler
-import org.apache.spark.ml.linalg.Vectors
-
-val assembler = new VectorAssembler().setInputCols(Array("ticker_id", "frmConfPeak" )).setOutputCol("features")
-val vd = assembler.transform(mlsrc).drop("ticker_id").drop("frmConfPeak")
-
->>>
-like libsvm
-vd: org.apache.spark.sql.DataFrame = [label: double, features: vector]
->>>
-
-import org.apache.spark.ml.classification.MultilayerPerceptronClassifier
-import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
-
-val data = vd
+val assembler = new VectorAssembler().setInputCols(Array("f1","f2","f3" )).setOutputCol("features")
+val dat = assembler.transform(mlsrc)
+val data = dat.drop("f1").drop("f2").drop("f3")
 val splits = data.randomSplit(Array(0.6, 0.4), seed = 1234L)
 val train = splits(0)
 val test = splits(1)
 println(" rows:"+data.count()+" train:"+train.count()+" test:"+test.count())
 
-val layers = Array[Int](2, 5, 5, 10)
-val trainer = new MultilayerPerceptronClassifier().setLayers(layers).setLabelCol("label").setFeaturesCol("features").setBlockSize(128).setSeed(1234L).setMaxIter(1000)
-val model = trainer.fit(train) //we can save it for future use
-
+val layers = Array[Int](3, 5, 5, 2)
+val trainer = new MultilayerPerceptronClassifier().setLayers(layers).setLabelCol("label").setFeaturesCol("features").setBlockSize(128).setSeed(1234L).setMaxIter(10)
+val model = trainer.fit(train)
 val result = model.transform(test)
 result.show()
+
+val predictionAndLabels = result.select("prediction", "label")
+predictionAndLabels.show()
+val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy")
+println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
+
+
+spark.catalog.dropGlobalTempView("res")
+result.createGlobalTempView("res")
+
+spark.sql("""
+             select probability
+               from global_temp.res
+""").show()
+
+val vectorToColumn = udf{ (x:DenseVector, index: Int) => x(index) }
+
+val resToCass = result.withColumn("p0",round(vectorToColumn(col("probability"),lit(0)),2)).withColumn("p1",round(vectorToColumn(col("probability"),lit(1)),2))
+.withColumn("formprops",col("f1").cast("Int")*100+col("f2").cast("Int")*10+col("f3")).drop("probability").drop("rawPrediction").drop("features").drop("f1").drop("f2").drop("f3")
+
+resToCass.show()
+resToCass.printSchema()
+
+resToCass.write.format("org.apache.spark.sql.cassandra").options(Map( "table" -> "result", "keyspace" -> "mts_ml")).save()
+
+
+
+///////////////  col("formprops")("frmConfPeak").as("frmConfPeak").cast("Int")
+///////////////  val y = x.withColumn("col1", round($"col1", 3))
+
+>> research
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+import org.apache.spark.sql.functions._
+result.write.format("org.apache.spark.sql.cassandra").options(Map( "table" -> "result", "keyspace" -> "mts_ml")).save()
+
+
+
+Test set accuracy = 0.5105281325509148
+
+spark.sql("""
+             select probability,
+                    getprob(probability,1) as p1
+               from global_temp.res
+""").show()
+
+
+
+spark.udf.register("getprob", (v: Vector[Double], i: Int) => v(i))
+spark.catalog.listFunctions.filter('name like "%getprob%").show(false)
+
+
+
+
+
+For 1,2,3 - Test set accuracy        = 0.5035748792270531
+For 1,2,3,4,5,6 - Test set accuracy  = 0.5455140798952194  setMaxIter(1000)
+For 1,2,3,4,5,6 - Test set accuracy  = 0.5455140798952194  setMaxIter(100)
+For 1,2,3,4,5,6 - Test set accuracy  = 0.5455140798952194  setMaxIter(10)
+
+-- проход сверху вниз через уровень
+spark.sql("""
+             select res_type,
+                    count(*) as cnt
+               from global_temp.frms
+              where frmConfPeak=123
+              group by res_type
+""").show()
++--------+---+
+|res_type|cnt|
++--------+---+
+|      mn|400|0
+|      mx|423|1
++--------+---+
+-- на всех данных
++--------+----+
+|res_type| cnt|
++--------+----+
+|      mn|1603|0
+|      mx|1639|1
++--------+----+
+
+
+
+-- проход снизу вверху через урвоень
+spark.sql("""
+             select res_type,
+                    count(*) as cnt
+               from global_temp.frms
+              where frmConfPeak=321
+              group by res_type
+""").show()
++--------+---+
+|res_type|cnt|
++--------+---+
+|      mn|411|0
+|      mx|449|1
++--------+---+
+-- на всех данных
++--------+----+
+|res_type| cnt|
++--------+----+
+|      mn|1819|0
+|      mx|1892|1
++--------+----+
+
+
+Using of trained model:
+import org.apache.spark.ml.feature.StringIndexer
+import org.apache.spark.ml.attribute._
+import org.apache.spark.ml.feature.VectorAssembler
+
+val pointM = sc.parallelize(Seq((1.0, 2.0, 3.0))).toDF("f1", "f2" ,"f3")
+val assemblerp = new VectorAssembler().setInputCols(Array("f1", "f2", "f3")).setOutputCol("features")
+val transformed = assemblerp.transform(pointM)
+val resultPoint = model.transform(transformed)
+resultPoint.show()
+
+val pointM = sc.parallelize(Seq((3.0, 2.0, 1.0))).toDF("f1", "f2" ,"f3")
+val assemblerp = new VectorAssembler().setInputCols(Array("f1", "f2", "f3")).setOutputCol("features")
+val transformed = assemblerp.transform(pointM)
+val resultPoint = model.transform(transformed)
+resultPoint.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--==============================================================================================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//val assembler = new VectorAssembler().setInputCols(Array("ticker_id", "frmConfPeak" )).setOutputCol("features")
+//only one column in features
+
+val assembler = new VectorAssembler().setInputCols(Array("frmConfPeak" )).setOutputCol("features")
+val data = assembler.transform(mlsrc).drop("ticker_id").drop("frmConfPeak")
+val splits = data.randomSplit(Array(0.6, 0.4), seed = 1234L)
+val train = splits(0)
+val test = splits(1)
+println(" rows:"+data.count()+" train:"+train.count()+" test:"+test.count())
+
+/*
+ specify layers for the neural network:
+ 1) input layer of size 4 (features),
+ 2) two intermediate of size 5 and 4
+ 3) and output of size 3 (classes)
+val layers = Array[Int](4, 5, 4, 3)
+*/
+
+val layers = Array[Int](2, 5, 5, 2)
+val trainer = new MultilayerPerceptronClassifier().setLayers(layers).setLabelCol("label").setFeaturesCol("features").setBlockSize(128).setSeed(1234L).setMaxIter(100)
+val model = trainer.fit(train)
+val result = model.transform(test)
+result.show()
+
+val predictionAndLabels = result.select("prediction", "label")
+predictionAndLabels.show()
+val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy")
+println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--==============================================================================================================================================
+
+
 
 
 
@@ -202,7 +421,6 @@ spark.sql("""
 
 //source data : metrics.
 
-
 val ds_frm_1_600 = getFormsDb(1,600)
 val ds_frm_3_600 = getFormsDb(3,600)
 
@@ -229,31 +447,6 @@ spark.sql("""
 """).show()
 
 unuseful incorrect forms with small deep.
-
-+---------+-------------+-------------+-------------+------------+----------------+
-|ticker_id|bar_width_sec|     ts_begin|       ts_end|ts_end_ddate|      ts_eb_secs|
-+---------+-------------+-------------+-------------+------------+----------------+
-|        3|          600|            0|1549290516164|  04-02-2019|1.549290516164E9|
-|        3|          600|1549290516164|1549290516164|  04-02-2019|             0.0|
-|        3|          600|1549290516164|1549291103752|  04-02-2019|         587.588|
-|        3|          600|1549290516189|1549291103752|  04-02-2019|         587.563|
-|        3|          600|1549522692203|1549526292016|  07-02-2019|        3599.813|
-|        3|          600|1549522692259|1549526292016|  07-02-2019|        3599.757|
-|        3|          600|1549525692122|1549529291869|  07-02-2019|        3599.747|
-|        3|          600|1549525692268|1549529291869|  07-02-2019|        3599.601|
-|        3|          600|1549526292182|1549529892062|  07-02-2019|         3599.88|
-|        3|          600|1549526293633|1549529892062|  07-02-2019|        3598.429|
-|        3|          600|1549542492949|1549546092279|  07-02-2019|         3599.33|
-|        3|          600|1549542495085|1549546092279|  07-02-2019|        3597.194|
-|        1|          600|1549659600332|1549663200271|  08-02-2019|        3599.939|
-|        3|          600|1549659600332|1549663200329|  08-02-2019|        3599.997|
-|        1|          600|1549659601334|1549663200271|  08-02-2019|        3598.937|
-|        3|          600|1549659601334|1549663200329|  08-02-2019|        3598.995|
-|        3|          600|1549890473388|1549894073354|  11-02-2019|        3599.966|
-|        3|          600|1549890473412|1549894073354|  11-02-2019|        3599.942|
-|        1|          600|1549891112686|1549894712628|  11-02-2019|        3599.942|
-|        1|          600|1549891113270|1549894712628|  11-02-2019|        3599.358|
-+---------+-------------+-------------+-------------+------------+----------------+
 
 //convert it into scala collection
 val ora_parts_list = df_ora_parts_names.as[(String)].collect.toSeq
@@ -335,3 +528,26 @@ case class rowNewData(ddate: Int,id_pok: Int,id_row: String, sval: BigDecimal, c
 val new_dat = dat.map { row =>(row: @unchecked) match {case rowData => rowNewData(row.ddate, row.id_pok, row.id_row, row.sval, {if (row.sval>65000.0) 1 else 0} )}}
 
 */
+
+
+pipeline example
+
+ val hiveContext = new HiveContext(sc)
+
+    val df = hiveContext.sql("select * from prediction_test")
+    df.show()
+    val credit_indexer = new StringIndexer().setInputCol("transaction_credit_card").setOutputCol("creditCardIndex").fit(df)
+    val category_indexer = new StringIndexer().setInputCol("transaction_category").setOutputCol("categoryIndex").fit(df)
+    val location_flag_indexer = new StringIndexer().setInputCol("location_flag").setOutputCol("locationIndex").fit(df)
+    val label_indexer = new StringIndexer().setInputCol("fraud").setOutputCol("label").fit(df)
+
+    val assembler =  new VectorAssembler().setInputCols(Array("transaction_amount", "creditCardIndex","categoryIndex","locationIndex")).setOutputCol("features")
+    val lr = new LogisticRegression().setMaxIter(10).setRegParam(0.01)
+    val pipeline = new Pipeline().setStages(Array(credit_indexer, category_indexer, location_flag_indexer, label_indexer, assembler, lr))
+
+    val model = pipeline.fit(df)
+
+    pipeline.save("/user/f42h/prediction/pipeline")
+    model.save("/user/f42h/prediction/model")
+ //   val sameModel = PipelineModel.load("/user/bob/prediction/model")
+    model.transform(df).select("features","label","prediction")
