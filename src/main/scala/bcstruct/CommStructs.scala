@@ -303,6 +303,8 @@ object bForm {
       }
     }
 
+    //here we can calculate any all forms properties.
+
     /**
       * Here calculate any properties for FormProps.
     */

@@ -1,13 +1,89 @@
 
+def simpleRound3Double(valueD : Double) = {
+  (valueD * 1000).round / 1000.toDouble
+}
+
 case class tinyTick(db_tsunx  :Long,
                     ask       :Double)
+
 val seqTicks = Seq(
   tinyTick(1,20),  tinyTick(2,21),  tinyTick(3,22),  tinyTick(4,22),  tinyTick(5,21),
-  tinyTick(6,22),  tinyTick(7,21),  tinyTick(8,24),  tinyTick(9,25),  tinyTick(10,27),
+  tinyTick(6,21),  tinyTick(7,21),  tinyTick(8,24),  tinyTick(9,25),  tinyTick(10,27),
   tinyTick(11,25),  tinyTick(12,24),  tinyTick(13,23),  tinyTick(14,22),  tinyTick(15,21),
   tinyTick(16,22),  tinyTick(17,23),  tinyTick(18,25),  tinyTick(29,27),  tinyTick(20,28),
   tinyTick(21,30))
 
+seqTicks.size
+
+val seqTicksLead = seqTicks.tail
+
+val pairsCurrNxt :Seq[(tinyTick,tinyTick)] = seqTicks.zip(seqTicksLead)
+
+pairsCurrNxt.head
+pairsCurrNxt.tail.head
+
+val filterUp: ((tinyTick,tinyTick)) => Boolean = {
+  case (f: tinyTick, s: tinyTick) => if (f.ask < s.ask) true else false
+}
+
+val filterDown: ((tinyTick,tinyTick)) => Boolean = {
+  case (f: tinyTick, s: tinyTick) => if (f.ask > s.ask) true else false
+}
+
+val filterPairInInterval : ((tinyTick,tinyTick),Double,Double) => Boolean = {
+  case ((f: tinyTick, s: tinyTick),beginInterval,endInterval) =>
+    if ((s.ask-f.ask) >= beginInterval && (s.ask-f.ask) < endInterval) true
+    else false
+}
+
+val seqPairsUp = pairsCurrNxt.filter(filterUp)
+val seqPairsDown = pairsCurrNxt.filter(filterDown).map(elm => (elm._2,elm._1))
+
+println("pairsCurrNxt.size="+pairsCurrNxt.size)
+println("seqPairsUp.size="+seqPairsUp.size)
+println("seqPairsDown.size="+seqPairsDown.size)
+
+val n = 10
+val minPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).min
+val maxPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).max
+val widthPairsUp = simpleRound3Double((maxPairUpStep - minPairUpStep)/n)
+
+val Sp = for(idx <- Range(1,n+2)) yield {
+  val freqInterval = seqPairsUp.count(elm => filterPairInInterval(
+    elm,
+    minPairUpStep+(idx-1)*widthPairsUp,
+    minPairUpStep+idx*widthPairsUp
+  ))
+  simpleRound3Double((minPairUpStep+idx*widthPairsUp) - (minPairUpStep+(idx-1)*widthPairsUp)
+  )*freqInterval
+}
+
+val minPairDownStep = (seqPairsDown.map(e => (e._2.ask-e._1.ask)).min)
+val maxPairDownStep = (seqPairsDown.map(e => (e._2.ask-e._1.ask)).max)
+val widthPairsDown = simpleRound3Double((maxPairDownStep - minPairDownStep)/n)
+
+val Sm = for(idx <- Range(1,n+2)) yield {
+  val freqInterval :Int = seqPairsDown.count(elm => filterPairInInterval(
+    elm,
+    minPairDownStep+(idx-1)*widthPairsDown,
+    minPairDownStep+idx*widthPairsDown
+  ))
+  simpleRound3Double((minPairDownStep+idx*widthPairsDown)-(minPairDownStep+(idx-1)*widthPairsDown)
+    )*freqInterval
+}
+
+println("Sp = " + simpleRound3Double(Sp.sum/(Sp.sum+Sm.sum)))
+println("Sm = " + simpleRound3Double(Sm.sum/(Sp.sum+Sm.sum)))
+
+
+
+//val freqsPairsUp = for (r <- range())
+
+
+
+
+
+/*
 val formCMin = seqTicks.map(_.ask).min          // total min price
 val formCMax = seqTicks.map(_.ask).max          // total max price
 val n = 10
@@ -22,6 +98,7 @@ val rangeFreq :Seq[(Double,Int)] = rangesC.map(rng =>
 for (r <- rangeFreq) println(r)
 
 rangeFreq.maxBy(r => r._2)._1
+*/
 
 /*
 

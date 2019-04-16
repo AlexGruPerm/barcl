@@ -398,3 +398,12 @@ create table mts_ml.result(
  formprops   int,
  PRIMARY KEY (label, prediction, p0, p1, formprops)
 )
+
+create table mts_ml.result(
+ label       double,
+ frmconfpeak int,
+ prediction  double,
+ p0    double,
+ p1    double,
+ PRIMARY KEY (label, frmconfpeak, prediction, p0,p1)
+);
