@@ -750,7 +750,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      //.filter(r =>  r.tickerId==21 && r.barWidthSec==60) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      .filter(r =>  r.tickerId==7 /*&& r.barWidthSec==60*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }

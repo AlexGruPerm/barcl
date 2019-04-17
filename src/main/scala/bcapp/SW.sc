@@ -11,16 +11,9 @@ val seqTicks = Seq(
   tinyTick(6,21),  tinyTick(7,21),  tinyTick(8,24),  tinyTick(9,25),  tinyTick(10,27),
   tinyTick(11,25),  tinyTick(12,24),  tinyTick(13,23),  tinyTick(14,22),  tinyTick(15,21),
   tinyTick(16,22),  tinyTick(17,23),  tinyTick(18,25),  tinyTick(29,27),  tinyTick(20,28),
-  tinyTick(21,30))
+  tinyTick(21,28))
 
-seqTicks.size
-
-val seqTicksLead = seqTicks.tail
-
-val pairsCurrNxt :Seq[(tinyTick,tinyTick)] = seqTicks.zip(seqTicksLead)
-
-pairsCurrNxt.head
-pairsCurrNxt.tail.head
+val pairsCurrNxt :Seq[(tinyTick,tinyTick)] = seqTicks.zip(seqTicks.tail)
 
 val filterUp: ((tinyTick,tinyTick)) => Boolean = {
   case (f: tinyTick, s: tinyTick) => if (f.ask < s.ask) true else false
@@ -38,10 +31,6 @@ val filterPairInInterval : ((tinyTick,tinyTick),Double,Double) => Boolean = {
 
 val seqPairsUp = pairsCurrNxt.filter(filterUp)
 val seqPairsDown = pairsCurrNxt.filter(filterDown).map(elm => (elm._2,elm._1))
-
-println("pairsCurrNxt.size="+pairsCurrNxt.size)
-println("seqPairsUp.size="+seqPairsUp.size)
-println("seqPairsDown.size="+seqPairsDown.size)
 
 val n = 10
 val minPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).min
@@ -80,7 +69,7 @@ println("Sm = " + simpleRound3Double(Sm.sum/(Sp.sum+Sm.sum)))
 //val freqsPairsUp = for (r <- range())
 
 
-
+//Prepare descriptions of SpS SmS with sceenshots.
 
 
 /*

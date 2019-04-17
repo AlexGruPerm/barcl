@@ -48,61 +48,69 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
     logger.debug("barsFam.size="+barsFam.size+" Distinct(tickerID,BSW).size="+barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.size)
 
 
-    val lastBarsOfForms :Seq[(Int, barsResToSaveDB)] =
+    val lastBarsOfFormsAllTickers :Seq[(Int, barsResToSaveDB)] =
     barsFam.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.toList
-      .flatMap/*collect*/{
+      .flatMap{
         case (tickerId,barWidthSec) =>
           firstLog(tickerId,barWidthSec)
-          seqWays.flatMap/*collect*/{
-            case (wayType :String) =>
+          seqWays.flatMap{
+            case wayType :String =>
           val minDdateTsFromBForms :Option[(LocalDate,Long)] = dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef, wayType)
           logger.debug("(3) minDdateFromBForms="+minDdateTsFromBForms)
-          logger.debug("Distinct ddates for ("+tickerId+","+barWidthSec+") SIZE="+barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec).size)
+          logger.debug("Distinct ddates for ("+tickerId+","+barWidthSec+") SIZE="+barsFam.count(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec))
           val allFABars: Seq[barsResToSaveDB] = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec),minDdateTsFromBForms)
           allFABarsDebugLog(tickerId,barWidthSec,allFABars)
-          //val lastBarsOfForms :Seq[(Int, barsResToSaveDB)] =
               prcntsDiv
                 .withFilter(thisPercent => allFABars.exists(b => b.log_oe == thisPercent && b.res_type == wayType))
                 .flatMap(
                 thisPercent =>
                   dbInst.filterFABars(allFABars.filter(b => b.log_oe == thisPercent && b.res_type == wayType), intervalNewGroupKoeff)
-                )//.flatten
-          }//.flatten
-    }//.flatten
+                )
+          }
+    }
 
+    //debugLastBarsOfGrp(lastBarsOfFormsAllTickers)
+    logger.info(" -!!! --     lastBarsOfFormsAllTickers ROWS=" + lastBarsOfFormsAllTickers.size + " SIZE OF WHOLE  = " + SizeEstimator.estimate(lastBarsOfFormsAllTickers) / 1024L + " Kb.")
 
-    //debugLastBarsOfGrp(lastBarsOfForms)
-    logger.info(" -!!! --     lastBarsOfForms ROWS=" + lastBarsOfForms.size + " SIZE OF WHOLE  = " + SizeEstimator.estimate(lastBarsOfForms) / 1024L + " Kb.")
-    val firstBarOfLastBars = lastBarsOfForms.map(b => b._2)/*.filter(elm => elm.res_type==wayType)*/.minBy(elm => elm.ts_end)
-    val lastBarOfLastBars = lastBarsOfForms.map(b => b._2)/*.filter(elm => elm.res_type==wayType)*/.maxBy(elm => elm.ts_end)
-    logger.debug("getAllTicksForForms for FB TS_END=" + firstBarOfLastBars.ts_end + " FB_DDATE=" + firstBarOfLastBars.dDate +
-      " LB TS_END=" + lastBarOfLastBars.ts_end + " LB_DDATE=" + lastBarOfLastBars.dDate)
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    //next code we must run by separated ticker_id in "loop"
+    //and not use lastBarsOfFormsAllTickers inside
 
+    lastBarsOfFormsAllTickers.map(b => b._2.tickerId).distinct.map {
+      case thisTickerID =>
 
-    lastBarsOfForms.map(b => (b._2.tickerId,b._2.barWidthSec)).distinct.toList
-      .collect {
-        case (tickerId, barWidthSec) =>
+        val firstBarOfLastBars = lastBarsOfFormsAllTickers.map(b => b._2).filter(elm => elm.tickerId==thisTickerID).minBy(elm => elm.ts_end)
+        val lastBarOfLastBars = lastBarsOfFormsAllTickers.map(b => b._2).filter(elm => elm.tickerId==thisTickerID).maxBy(elm => elm.ts_end)
 
-          //single read for each ddate for this tickerID. !!!!!!!!!!!!!!!!!!
-          val seqFormAllTinyTicks: Seq[tinyTick] = dbInst.getAllTicksForForms(
-            tickerId,
-            firstBarOfLastBars.ts_end,
-            lastBarOfLastBars.ts_end,
-            firstBarOfLastBars.dDate,
-            lastBarOfLastBars.dDate)
+        logger.debug(" thisTickerID="+thisTickerID+" getAllTicksForForms for FB TS_END=" + firstBarOfLastBars.ts_end + " FB_DDATE=" + firstBarOfLastBars.dDate +
+          " LB TS_END=" + lastBarOfLastBars.ts_end + " LB_DDATE=" + lastBarOfLastBars.dDate)
 
-          logger.debug(" =[1]======= seqFormAllTinyTicks.ROWS=[" + seqFormAllTinyTicks.size + "] SIZE =[" + SizeEstimator.estimate(seqFormAllTinyTicks) / 1024L / 1024L + "] Mb. ========")
+        //lastBarsOfFormsAllTickers.map(b => (b._2.tickerId, b._2.barWidthSec)).distinct.toList
+        lastBarsOfFormsAllTickers.map(b => b._2).filter(elm => elm.tickerId == thisTickerID).map(fb => (fb.tickerId, fb.barWidthSec)).distinct.toList
+          .collect {
+            case (tickerId, barWidthSec) =>
 
-          val seqForms: Seq[bForm] =
-            lastBarsOfForms.collect {
-              case (grpNum: Int, lb: barsResToSaveDB)  =>
-                val seqFormTicks: Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.ts_end - formDeepKoef * lb.barWidthSec * 1000L) && t.db_tsunx <= lb.ts_end)
-                bForm.create(lb, formDeepKoef, seqFormTicks)
-            }
-          logger.debug(" =[2]======= seqForms.ROWS=[" + seqForms.size + "] SIZE =[" + SizeEstimator.estimate(seqForms) / 1024L + "] Kb. ========")
-          dbInst.saveForms(seqForms.toList.filter(elm => (elm.TsBegin!=0L && (elm.TsEnd-elm.TsBegin)/1000L >= (elm.formDeepKoef-1)*elm.barWidthSec)))
+              //single read for each ddate for this tickerID. !!!!!!!!!!!!!!!!!!
+              val seqFormAllTinyTicks: Seq[tinyTick] = dbInst.getAllTicksForForms(
+                tickerId,
+                firstBarOfLastBars.ts_end,
+                lastBarOfLastBars.ts_end,
+                firstBarOfLastBars.dDate,
+                lastBarOfLastBars.dDate)
 
-      }
+              logger.debug(" =[1]======= seqFormAllTinyTicks.ROWS=[" + seqFormAllTinyTicks.size + "] SIZE =[" + SizeEstimator.estimate(seqFormAllTinyTicks) / 1024L / 1024L + "] Mb. ========")
+
+              val seqForms: Seq[bForm] =
+                lastBarsOfFormsAllTickers.filter(groupBars => groupBars._2.tickerId == thisTickerID).collect {
+                  case (grpNum: Int, lb: barsResToSaveDB) =>
+                    val seqFormTicks: Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.ts_end - formDeepKoef * lb.barWidthSec * 1000L) && t.db_tsunx <= lb.ts_end)
+                    bForm.create(lb, formDeepKoef, seqFormTicks)
+                }
+              logger.debug(" =[2]======= seqForms.ROWS=[" + seqForms.size + "] SIZE =[" + SizeEstimator.estimate(seqForms) / 1024L + "] Kb. ========")
+              dbInst.saveForms(seqForms.toList.filter(elm => (elm.TsBegin != 0L && (elm.TsEnd - elm.TsBegin) / 1000L >= (elm.formDeepKoef - 1) * elm.barWidthSec)))
+
+          }
+    }
 
   }
 

@@ -251,8 +251,11 @@ object bForm {
   def create(barFa        :barsResToSaveDB,//barsFaData,
              formDeepKoef :Int,
              seqTicks     :Seq[tinyTick]) :bForm = {
-    val ticksCnt :Int = seqTicks.size
-    val tsBegin = seqTicks.size match {case 0 => 0L case _ => seqTicks.map(t => t.db_tsunx).min}
+    val ticksCnt: Int = seqTicks.size
+    val tsBegin = seqTicks.size match {
+      case 0 => 0L
+      case _ => seqTicks.map(t => t.db_tsunx).min
+    }
 
     /**
       * Calculate form configuration.
@@ -270,10 +273,19 @@ object bForm {
       * then possible (1,0,1),(1,0,2) etc.
       */
 
-     // println("create1:                       seqTicks.size = "+seqTicks.size)
-     // println("create2: seqTicks.maxBy(_.db_tsunx).db_tsunx = "+seqTicks.maxBy(_.db_tsunx).db_tsunx)
+    def simpleRound3Double(valueD: Double) = {
+      (valueD * 1000).round / 1000.toDouble
+    }
 
-    val frmConfPeak :Int = {
+
+    def simpleRound6Double(valueD: Double) = {
+      (valueD * 1000000).round / 1000000.toDouble
+    }
+
+    // println("create1:                       seqTicks.size = "+seqTicks.size)
+    // println("create2: seqTicks.maxBy(_.db_tsunx).db_tsunx = "+seqTicks.maxBy(_.db_tsunx).db_tsunx)
+
+    val frmConfPeak: Int = {
       if (seqTicks.isEmpty) 0
       else {
         // Check that real seq width in seconds no less than contol limit.
@@ -303,7 +315,91 @@ object bForm {
       }
     }
 
+
     //here we can calculate any all forms properties.
+    //         (SpS,SmS)
+    val SdivS: (Double, Double) = if (seqTicks.toList.size <= 1) {
+      (0.0,0.0)
+    }
+    else {
+      val pairsCurrNxt :Seq[(tinyTick,tinyTick)] = seqTicks.zip(seqTicks.tail)
+
+      val filterUp: ((tinyTick,tinyTick)) => Boolean = {
+        case (f: tinyTick, s: tinyTick) => if (f.ask < s.ask) true else false
+      }
+
+      val filterDown: ((tinyTick,tinyTick)) => Boolean = {
+        case (f: tinyTick, s: tinyTick) => if (f.ask > s.ask) true else false
+      }
+
+      val filterPairInInterval : ((tinyTick,tinyTick),Double,Double) => Boolean = {
+        case ((f: tinyTick, s: tinyTick),beginInterval,endInterval) =>
+          if ((s.ask-f.ask) >= beginInterval && (s.ask-f.ask) < endInterval) true
+          else false
+      }
+
+      val seqPairsUp = pairsCurrNxt.filter(filterUp)
+      val seqPairsDown = pairsCurrNxt.filter(filterDown).map(elm => (elm._2,elm._1))
+
+      println(" seqPairsUp.size="+seqPairsUp.size)
+      println(" seqPairsDown.size="+seqPairsDown.size)
+
+      println(" example (ask1 - ask2): "+seqPairsUp.head._1.ask+" - "+seqPairsUp.head._2.ask)
+
+      val n = 10
+      val minPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).reduceOption(_ min _).getOrElse(0.0)
+      val maxPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).reduceOption(_ max _).getOrElse(0.0)
+      val widthPairsUp = simpleRound6Double((maxPairUpStep - minPairUpStep)/n)
+
+      println(" minPairUpStep="+minPairUpStep)
+      println(" maxPairUpStep="+maxPairUpStep)
+      println(" widthPairsUp="+widthPairsUp)
+
+      val Sp :Double = if (widthPairsUp == 0) 0.000000
+      else (
+        for (idx <- Range(1, n + 2)) yield {
+          val freqInterval = seqPairsUp.count(elm => filterPairInInterval(
+            elm,
+            minPairUpStep + (idx - 1) * widthPairsUp,
+            minPairUpStep + idx * widthPairsUp
+          ))
+          simpleRound6Double((minPairUpStep + idx * widthPairsUp) - (minPairUpStep + (idx - 1) * widthPairsUp)
+          ) * freqInterval
+        }).sum
+
+      val minPairDownStep = seqPairsDown.map(e => (e._2.ask-e._1.ask)).reduceOption(_ min _).getOrElse(0.0)
+      val maxPairDownStep = seqPairsDown.map(e => (e._2.ask-e._1.ask)).reduceOption(_ max _).getOrElse(0.0)
+      val widthPairsDown = simpleRound6Double((maxPairDownStep - minPairDownStep)/n)
+
+      val Sm :Double = if (widthPairsDown == 0) 0.000000
+      else (
+        for (idx <- Range(1, n + 2)) yield {
+          val freqInterval: Int = seqPairsDown.count(elm => filterPairInInterval(
+            elm,
+            minPairDownStep + (idx - 1) * widthPairsDown,
+            minPairDownStep + idx * widthPairsDown
+          ))
+          simpleRound6Double((minPairDownStep + idx * widthPairsDown) - (minPairDownStep + (idx - 1) * widthPairsDown)
+          ) * freqInterval
+        }).sum
+
+      println("ticker_id= "+barFa.tickerId)
+
+      println("barFa.ts_end = "+barFa.ts_end)
+      println("barFa.c = "+barFa.c)
+      println("barFa.ts_end_res = "+barFa.ts_end_res)
+      println("barFa.c_res = "+barFa.c_res)
+
+      println("seqTicks TS begin= "+seqTicks.minBy(e => e.db_tsunx).db_tsunx)
+      println("seqTicks TS end= "+seqTicks.maxBy(e => e.db_tsunx).db_tsunx)
+      println("seqTicks CNT= "+seqTicks.size)
+
+      println("SpS = " + simpleRound3Double(Sp/(Sp+Sm)))
+      println("SmS = " + simpleRound3Double(Sm/(Sp+Sm)))
+      println("====================================================================")
+      (simpleRound3Double(Sp/(Sp+Sm)),simpleRound3Double(Sm/(Sp+Sm)))
+    }
+
 
     /**
       * Here calculate any properties for FormProps.
@@ -322,8 +418,11 @@ object bForm {
         barFa.c_res,
         formDeepKoef,
         Map(
-          "ticksCnt"->ticksCnt.toString,
-          "frmConfPeak"->frmConfPeak.toString)
+          "tickscnt"    -> ticksCnt.toString,
+          "frmconfpeak" -> frmConfPeak.toString,
+          "sps"         -> SdivS._1.toString,
+          "sms"         -> SdivS._2.toString
+        )
       )
   }
 }
