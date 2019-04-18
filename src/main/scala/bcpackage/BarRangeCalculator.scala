@@ -67,7 +67,10 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
             r.srcBar.ts_end,
             r.srcBar.c,
             r.p,
-            r.srcBar.ts_end, //we don't need None cases if we use filter(elm => elm.resAnal.isDefined)
+            //r.srcBar.ts_end, //we don't need None cases if we use filter(elm => elm.resAnal.isDefined)
+            r.resAnal match {
+              case Some(ri) => ri.ts_end
+            },
             r.resAnal match {
               case Some(ri) => Math.round((ri.ts_end - r.srcBar.ts_end)/1000L).toInt
             },
