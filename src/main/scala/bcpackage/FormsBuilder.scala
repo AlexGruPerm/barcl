@@ -72,10 +72,6 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
     //debugLastBarsOfGrp(lastBarsOfFormsAllTickers)
     logger.info(" -!!! --     lastBarsOfFormsAllTickers ROWS=" + lastBarsOfFormsAllTickers.size + " SIZE OF WHOLE  = " + SizeEstimator.estimate(lastBarsOfFormsAllTickers) / 1024L + " Kb.")
 
-    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    //next code we must run by separated ticker_id in "loop"
-    //and not use lastBarsOfFormsAllTickers inside
-
     lastBarsOfFormsAllTickers.map(b => b._2.tickerId).distinct.map {
       case thisTickerID =>
 

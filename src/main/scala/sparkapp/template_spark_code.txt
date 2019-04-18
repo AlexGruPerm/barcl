@@ -124,6 +124,7 @@ val ds :Dataset[Form] = seqDsForms.reduce(_ union _)
 ds.cache()
 ds.count()
 
+
 spark.catalog.dropGlobalTempView("frms")
 ds.createGlobalTempView("frms")
 spark.sql("""select res_type,frmConfPeak from global_temp.frms """).show()

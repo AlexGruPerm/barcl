@@ -273,14 +273,11 @@ object bForm {
       * then possible (1,0,1),(1,0,2) etc.
       */
 
-    def simpleRound3Double(valueD: Double) = {
+    def simpleRound3Double(valueD: Double) =
       (valueD * 1000).round / 1000.toDouble
-    }
 
-
-    def simpleRound6Double(valueD: Double) = {
+    def simpleRound6Double(valueD: Double) =
       (valueD * 1000000).round / 1000000.toDouble
-    }
 
     // println("create1:                       seqTicks.size = "+seqTicks.size)
     // println("create2: seqTicks.maxBy(_.db_tsunx).db_tsunx = "+seqTicks.maxBy(_.db_tsunx).db_tsunx)
@@ -341,19 +338,22 @@ object bForm {
       val seqPairsUp = pairsCurrNxt.filter(filterUp)
       val seqPairsDown = pairsCurrNxt.filter(filterDown).map(elm => (elm._2,elm._1))
 
+      /*
       println(" seqPairsUp.size="+seqPairsUp.size)
       println(" seqPairsDown.size="+seqPairsDown.size)
-
       println(" example (ask1 - ask2): "+seqPairsUp.head._1.ask+" - "+seqPairsUp.head._2.ask)
+      */
 
       val n = 10
       val minPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).reduceOption(_ min _).getOrElse(0.0)
       val maxPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).reduceOption(_ max _).getOrElse(0.0)
       val widthPairsUp = simpleRound6Double((maxPairUpStep - minPairUpStep)/n)
 
+      /*
       println(" minPairUpStep="+minPairUpStep)
       println(" maxPairUpStep="+maxPairUpStep)
       println(" widthPairsUp="+widthPairsUp)
+      */
 
       val Sp :Double = if (widthPairsUp == 0) 0.000000
       else (
@@ -382,7 +382,7 @@ object bForm {
           simpleRound6Double((minPairDownStep + idx * widthPairsDown) - (minPairDownStep + (idx - 1) * widthPairsDown)
           ) * freqInterval
         }).sum
-
+      /*
       println("ticker_id= "+barFa.tickerId)
 
       println("barFa.ts_end = "+barFa.ts_end)
@@ -397,9 +397,69 @@ object bForm {
       println("SpS = " + simpleRound3Double(Sp/(Sp+Sm)))
       println("SmS = " + simpleRound3Double(Sm/(Sp+Sm)))
       println("====================================================================")
+      */
       (simpleRound3Double(Sp/(Sp+Sm)),simpleRound3Double(Sm/(Sp+Sm)))
     }
 
+
+    def analyzePVx(pAnalyze :Double,pv2 :Double,pv3 :Double) :Int ={
+      if (pAnalyze > Seq(pv2,pv3).max) 1
+      else if (pAnalyze < Seq(pv2,pv3).min) 3
+      else 2
+    }
+
+    /**
+      * ticks volume profile.
+      * All interval of ticks diveded on 3 parts, from left (ts_begin) to right (ts_end)
+      * equidistant.
+      * And we have 3 subproperties: pv1, pv2 , pv3
+      * each value take one value from (1,2,3) 1 for maximum, 2 for middle value, and 3 for minimum.
+      * For example: Volume profile 120,90,100
+      * then p1 = 1(max) pv2 = 3(min) pv3 = 2(mdl)  (1,3,2)
+      */
+      val pvX : (Int,Int,Int) = {
+       val totalTickVolume :Double = if (seqTicks.hasDefiniteSize) seqTicks.size else 0.0
+        if (totalTickVolume==0) (0,0,0)
+        else {
+          println("totalTickVolume="+totalTickVolume)
+         val tsBegin :Long = seqTicks.minBy(_.db_tsunx).db_tsunx
+         val tsEnd   :Long = seqTicks.maxBy(_.db_tsunx).db_tsunx
+         val tsStepWidth = (tsEnd - tsBegin)/3
+          println("tsBegin="+tsBegin+" tsEnd="+tsEnd+" tsStepWidth="+tsStepWidth)
+
+          println("count1="+seqTicks.count(tc => tc.db_tsunx >= tsBegin && tc.db_tsunx <= (tsBegin+tsStepWidth)))
+          println("count2="+seqTicks.count(tc => tc.db_tsunx >= (tsBegin+tsStepWidth) && tc.db_tsunx <= (tsBegin+2*tsStepWidth)))
+          println("count3="+seqTicks.count(tc => tc.db_tsunx >= (tsBegin+2*tsStepWidth) && tc.db_tsunx <= tsEnd))
+
+          val pv1 = simpleRound3Double(seqTicks.count(tc => tc.db_tsunx >= tsBegin && tc.db_tsunx <= (tsBegin+tsStepWidth))/totalTickVolume)
+          val pv2 = simpleRound3Double(seqTicks.count(tc => tc.db_tsunx >= (tsBegin+tsStepWidth) && tc.db_tsunx <= (tsBegin+2*tsStepWidth))/totalTickVolume)
+          val pv3 = simpleRound3Double(seqTicks.count(tc => tc.db_tsunx >= (tsBegin+2*tsStepWidth) && tc.db_tsunx <= tsEnd)/totalTickVolume)
+          println("barFa.tickerId="+barFa.tickerId+" ts_end="+barFa.ts_end+ " pv1="+pv1+" pv2="+pv2+" pv3="+pv3+"")
+          println("===================================")
+          (
+            analyzePVx(pv1,pv2,pv3),
+            analyzePVx(pv2,pv1,pv3),
+            analyzePVx(pv3,pv1,pv2)
+          )
+        }
+      }
+
+
+    /*
+    Property calculated from previous one.
+    As a short form
+    Just 5 possible values: 0,1,2,3,4 (0- unknown.)
+    */
+    val ticksValusFormation :Int = pvX match {
+      case (0,0,0) => 0 //not defined
+      case (1,2,3) => 1 // volume decreasing
+      case (3,2,1) => 2 // volume increasing
+      case (2,1,3) | (3,1,2) => 3 // Up peak in middle - maximum
+      case (1,3,2) | (2,3,1) => 4 // Down peak in middle - minimum
+      case _ => 0 //not defined
+    }
+
+    println("barFa.tickerId="+barFa.tickerId+" ts_end="+barFa.ts_end+ " ticksValusFormation="+ticksValusFormation)
 
     /**
       * Here calculate any properties for FormProps.
@@ -418,10 +478,11 @@ object bForm {
         barFa.c_res,
         formDeepKoef,
         Map(
-          "tickscnt"    -> ticksCnt.toString,
-          "frmconfpeak" -> frmConfPeak.toString,
-          "sps"         -> SdivS._1.toString,
-          "sms"         -> SdivS._2.toString
+          "tickscnt"     -> ticksCnt.toString,
+          "frmconfpeak"  -> frmConfPeak.toString,
+          "sps"          -> SdivS._1.toString,
+          "sms"          -> SdivS._2.toString,
+          "tcvolprofile" -> ticksValusFormation.toString
         )
       )
   }
