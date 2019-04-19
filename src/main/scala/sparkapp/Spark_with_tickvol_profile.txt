@@ -1,3 +1,4 @@
+
 spark-shell --driver-memory 3G --executor-memory 5G  --executor-cores 1 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --conf "spark.cassandra.connection.host=192.168.122.192"
 
 import org.apache.spark.sql._
@@ -24,7 +25,8 @@ case class Form(ticker_id     :Int,
                 formdeepkoef  :Int,
                 frmconfpeak   :Int,
                 sps           :Double,
-                sms           :Double
+                sms           :Double,
+                tcvolprofile  :Int
                 )
 
 case class ccLibSvm(label    :Int,
@@ -61,7 +63,8 @@ dsKeys.show()
                 col("formdeepkoef"),
                 col("formprops")("frmconfpeak").as("frmconfpeak").cast("Int"),
                 col("formprops")("sps").as("sps").cast("Double"),
-                col("formprops")("sms").as("sms").cast("Double")
+                col("formprops")("sms").as("sms").cast("Double"),
+                col("formprops")("tcvolprofile").as("tcvolprofile").cast("Int")
                 ).sort(asc("ticker_id"),asc("bar_width_sec"),asc("ts_begin")).as[Form]}
 
 val seqDsForms :Seq[Dataset[Form]] = dsKeys.collect.toSeq.map(elm => getFormsDb(elm.ticker_id,elm.bar_width_sec))
@@ -78,19 +81,22 @@ val mlsrc = ds.withColumn("label",
       col("label").cast(DoubleType),
       col("frmconfpeak"),
       col("sps"),
-      col("sms")
+      col("sms"),
+      col("tcvolprofile")
      ).withColumn("f1", round(col("frmconfpeak")/100)).withColumn("f2", round((col("frmconfpeak") - round(col("frmconfpeak")/100)*100)/10)).withColumn("f3", col("frmconfpeak") % 10)
 
 val clr = mlsrc
-val assembler = new VectorAssembler().setInputCols(Array("f1","f2","f3","sps","sms")).setOutputCol("features")
+val assembler = new VectorAssembler().setInputCols(Array("f1","f2","f3","sps","sms","tcvolprofile")).setOutputCol("features")
 val dat = assembler.transform(clr)
-val data = dat.drop("f1").drop("f2").drop("f3").drop("sps").drop("sms")
+val data = dat.drop("f1").drop("f2").drop("f3").drop("sps").drop("sms").drop("tcvolprofile")
 val splits = data.randomSplit(Array(0.6, 0.4), seed = 1234L)
 val train = splits(0)
 val test = splits(1)
 println(" rows:"+data.count()+" train:"+train.count()+" test:"+test.count())
 
-val layers = Array[Int](5, 10, 5, 3)
+//====================================================================================================================
+
+val layers = Array[Int](6, 10, 5, 3)
 val trainer = new MultilayerPerceptronClassifier().setLayers(layers).setLabelCol("label").setFeaturesCol("features").setBlockSize(128).setSeed(1234L).setMaxIter(100)
 val model = trainer.fit(train)
 val result = model.transform(test)
@@ -98,11 +104,42 @@ val predictionAndLabels = result.select("prediction", "label")
 val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy")
 println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
 
-Test set accuracy = 0.5149456521739131
+Test set accuracy = 0.5149456521739131 - without
+Test set accuracy = 0.5136054421768708 - with tcvolprofile
 
 //====================================================================================================================
 
+// recreate model on full Dataset
+
+val layers = Array[Int](6, 10, 5, 3)
+val trainer = new MultilayerPerceptronClassifier().setLayers(layers).setLabelCol("label").setFeaturesCol("features").setBlockSize(128).setSeed(1234L).setMaxIter(100)
+val model = trainer.fit(data)
+val result = model.transform(data) //on full data
+val predictionAndLabels = result.select("prediction", "label")
+val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy")
+println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
+
+Test set accuracy = 0.5610939567710631 //на полном наборе данных!
+
+spark.catalog.dropGlobalTempView("tmp")
+result.createGlobalTempView("tmp")
+spark.sql(""" select * from global_temp.tmp """)
 
 
+OK
+scala> spark.sql(""" select sum(1) as cnt from global_temp.tmp where label=prediction""").show
++----+
+| cnt|
++----+
+|1272| 4*300
++----+
 
+WRONG
+scala> spark.sql(""" select sum(1) as cnt from global_temp.tmp where label!=prediction""").show
++---+
+|cnt|
++---+
+|995| 3*300
++---+
 
+на 25% больше правильно предсказанных точек по полному набору данных.
