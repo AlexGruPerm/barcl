@@ -43,7 +43,21 @@ case class ccLibSvm(label    :Int,
                 col("bar_width_sec")
                 ).distinct.sort(asc("ticker_id"),asc("bar_width_sec")).as[FormKeys]}
 
+ //overwrite
+ def getKeysFormsDb :Dataset[FormKeys] = {
+            import org.apache.spark.sql.functions._
+            spark.read.format("org.apache.spark.sql.cassandra")
+              .options(Map("table" -> "bars_forms", "keyspace" -> "mts_bars"))
+              .load()
+              .select(
+                col("ticker_id"),
+                col("bar_width_sec")
+                ).distinct.sort(asc("ticker_id"),asc("bar_width_sec")).as[FormKeys]}
+
 val dsKeys = getKeysFormsDb(600);
+dsKeys.show()
+
+val dsKeys = getKeysFormsDb;
 dsKeys.show()
 
  def getFormsDb(TickerID :Int, BarWidthSec: Int) :Dataset[Form] = {
@@ -71,6 +85,7 @@ val seqDsForms :Seq[Dataset[Form]] = dsKeys.collect.toSeq.map(elm => getFormsDb(
 val ds :Dataset[Form] = seqDsForms.reduce(_ union _)
 ds.cache()
 ds.count()
+
 
 //====================================================================================================================
 
@@ -104,8 +119,14 @@ val predictionAndLabels = result.select("prediction", "label")
 val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy")
 println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
 
+xxx
+
+
+
 Test set accuracy = 0.5149456521739131 - without
 Test set accuracy = 0.5136054421768708 - with tcvolprofile
+Test set accuracy = 0.5281531531531531 - на полном наборе но по тесту!
+
 
 //====================================================================================================================
 
@@ -120,6 +141,7 @@ val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy"
 println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
 
 Test set accuracy = 0.5610939567710631 //на полном наборе данных!
+Test set accuracy = 0.5450153711023277 //на полном наборе данных!
 
 spark.catalog.dropGlobalTempView("tmp")
 result.createGlobalTempView("tmp")
@@ -133,6 +155,13 @@ scala> spark.sql(""" select sum(1) as cnt from global_temp.tmp where label=predi
 +----+
 |1272| 4*300
 +----+
+scala> spark.sql(""" select sum(1) as cnt from global_temp.tmp where label=prediction""").show
++----+
+| cnt|
++----+
+|1241|
++----+
+
 
 WRONG
 scala> spark.sql(""" select sum(1) as cnt from global_temp.tmp where label!=prediction""").show
@@ -141,5 +170,13 @@ scala> spark.sql(""" select sum(1) as cnt from global_temp.tmp where label!=pred
 +---+
 |995| 3*300
 +---+
+scala> spark.sql(""" select sum(1) as cnt from global_temp.tmp where label!=prediction""").show
++----+
+| cnt|
++----+
+|1036|
++----+
 
-на 25% больше правильно предсказанных точек по полному набору данных.
+
+
+на 25% больше правильно предсказанных точек по полному набору данных. For 2267 forms, all of bws=600.
