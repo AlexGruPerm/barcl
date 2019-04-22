@@ -1,4 +1,20 @@
 
+//autocorrelation
+
+case class tinyTick(db_tsunx  :Long,
+                    ask       :Double)
+
+val seqTicks = Seq(tinyTick(1,1.13449),  tinyTick(2,1.13447),  tinyTick(3,1.13444),
+  tinyTick(4,1.13449), tinyTick(5,1.13451), tinyTick(6,1.13459),  tinyTick(7,1.13469),
+  tinyTick(8,1.13479), tinyTick(9,1.13489),  tinyTick(10,1.13499), tinyTick(11,1.13499),
+  tinyTick(12,1.13489), tinyTick(13,1.13479), tinyTick(14,1.13469), tinyTick(15,1.13459),
+  tinyTick(16,1.13449), tinyTick(17,1.13439), tinyTick(18,1.13439),
+  tinyTick(29,1.13449), tinyTick(20,1.13469), tinyTick(21,1.13489))
+
+
+
+
+/*
 def simpleRound3Double(valueD : Double) = {
   (valueD * 1000).round / 1000.toDouble
 }
@@ -63,7 +79,7 @@ val Sm = for(idx <- Range(1,n+2)) yield {
 
 println("Sp = " + simpleRound3Double(Sp.sum/(Sp.sum+Sm.sum)))
 println("Sm = " + simpleRound3Double(Sm.sum/(Sp.sum+Sm.sum)))
-
+*/
 
 
 //val freqsPairsUp = for (r <- range())
