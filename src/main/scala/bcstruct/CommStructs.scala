@@ -345,8 +345,8 @@ object bForm {
       */
 
       val n = 10
-      val minPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).reduceOption(_ min _).getOrElse(0.0)
-      val maxPairUpStep = seqPairsUp.map(e => (e._2.ask-e._1.ask)).reduceOption(_ max _).getOrElse(0.0)
+      val minPairUpStep = seqPairsUp.map(e => e._2.ask-e._1.ask).reduceOption(_ min _).getOrElse(0.0)
+      val maxPairUpStep = seqPairsUp.map(e => e._2.ask-e._1.ask).reduceOption(_ max _).getOrElse(0.0)
       val widthPairsUp = simpleRound6Double((maxPairUpStep - minPairUpStep)/n)
 
       /*
@@ -367,8 +367,8 @@ object bForm {
           ) * freqInterval
         }).sum
 
-      val minPairDownStep = seqPairsDown.map(e => (e._2.ask-e._1.ask)).reduceOption(_ min _).getOrElse(0.0)
-      val maxPairDownStep = seqPairsDown.map(e => (e._2.ask-e._1.ask)).reduceOption(_ max _).getOrElse(0.0)
+      val minPairDownStep = seqPairsDown.map(e => e._2.ask-e._1.ask).reduceOption(_ min _).getOrElse(0.0)
+      val maxPairDownStep = seqPairsDown.map(e => e._2.ask-e._1.ask).reduceOption(_ max _).getOrElse(0.0)
       val widthPairsDown = simpleRound6Double((maxPairDownStep - minPairDownStep)/n)
 
       val Sm :Double = if (widthPairsDown == 0) 0.000000
@@ -421,21 +421,21 @@ object bForm {
        val totalTickVolume :Double = if (seqTicks.hasDefiniteSize) seqTicks.size else 0.0
         if (totalTickVolume==0) (0,0,0)
         else {
-          println("totalTickVolume="+totalTickVolume)
+//          println("totalTickVolume="+totalTickVolume)
          val tsBegin :Long = seqTicks.minBy(_.db_tsunx).db_tsunx
          val tsEnd   :Long = seqTicks.maxBy(_.db_tsunx).db_tsunx
          val tsStepWidth = (tsEnd - tsBegin)/3
-          println("tsBegin="+tsBegin+" tsEnd="+tsEnd+" tsStepWidth="+tsStepWidth)
-
+//          println("tsBegin="+tsBegin+" tsEnd="+tsEnd+" tsStepWidth="+tsStepWidth)
+/*
           println("count1="+seqTicks.count(tc => tc.db_tsunx >= tsBegin && tc.db_tsunx <= (tsBegin+tsStepWidth)))
           println("count2="+seqTicks.count(tc => tc.db_tsunx >= (tsBegin+tsStepWidth) && tc.db_tsunx <= (tsBegin+2*tsStepWidth)))
           println("count3="+seqTicks.count(tc => tc.db_tsunx >= (tsBegin+2*tsStepWidth) && tc.db_tsunx <= tsEnd))
-
+*/
           val pv1 = simpleRound3Double(seqTicks.count(tc => tc.db_tsunx >= tsBegin && tc.db_tsunx <= (tsBegin+tsStepWidth))/totalTickVolume)
           val pv2 = simpleRound3Double(seqTicks.count(tc => tc.db_tsunx >= (tsBegin+tsStepWidth) && tc.db_tsunx <= (tsBegin+2*tsStepWidth))/totalTickVolume)
           val pv3 = simpleRound3Double(seqTicks.count(tc => tc.db_tsunx >= (tsBegin+2*tsStepWidth) && tc.db_tsunx <= tsEnd)/totalTickVolume)
-          println("barFa.tickerId="+barFa.tickerId+" ts_end="+barFa.ts_end+ " pv1="+pv1+" pv2="+pv2+" pv3="+pv3+"")
-          println("===================================")
+//         println("barFa.tickerId="+barFa.tickerId+" ts_end="+barFa.ts_end+ " pv1="+pv1+" pv2="+pv2+" pv3="+pv3+"")
+//          println("===================================")
           (
             analyzePVx(pv1,pv2,pv3),
             analyzePVx(pv2,pv1,pv3),
@@ -459,7 +459,31 @@ object bForm {
       case _ => 0 //not defined
     }
 
-    println("barFa.tickerId="+barFa.tickerId+" ts_end="+barFa.ts_end+ " ticksValusFormation="+ticksValusFormation)
+    //println("barFa.tickerId="+barFa.tickerId+" ts_end="+barFa.ts_end+ " ticksValusFormation="+ticksValusFormation)
+
+
+    def getACFKoeff(acLevel :Int) :Double ={
+      val seqSrcX = seqTicks.drop(acLevel).map(_.ask)
+      val seqSrcY = seqTicks.take(seqTicks.size - acLevel).map(_.ask)
+
+      val n = seqSrcX.size
+
+      val avgX = seqSrcX.sum / n
+      val avgY = seqSrcY.sum / n
+
+      val avgXY = seqSrcX.zip(seqSrcY).map(elm => elm._1 * elm._2).sum / n
+      val prodAvgXY = avgX * avgY
+
+      val sigma2X = seqSrcX.map(e => Math.pow(e, 2)).sum / n - Math.pow(avgX, 2)
+      val sigma2Y = seqSrcY.map(e => Math.pow(e, 2)).sum / n - Math.pow(avgY, 2)
+
+      val r = (avgXY - prodAvgXY) / Math.sqrt(sigma2X * sigma2Y)
+      r
+    }
+
+    val acfLevel1 = simpleRound3Double(getACFKoeff(barFa.barWidthSec/2))
+    val acfLevel2 = simpleRound3Double(getACFKoeff(barFa.barWidthSec))
+    val acfLevel3 = simpleRound3Double(getACFKoeff(barFa.barWidthSec*2))
 
     /**
       * Here calculate any properties for FormProps.
@@ -482,7 +506,10 @@ object bForm {
           "frmconfpeak"  -> frmConfPeak.toString,
           "sps"          -> SdivS._1.toString,
           "sms"          -> SdivS._2.toString,
-          "tcvolprofile" -> ticksValusFormation.toString
+          "tcvolprofile" -> ticksValusFormation.toString,
+          "acf_05_bws"  -> acfLevel1.toString,
+          "acf_1_bws"   -> acfLevel2.toString,
+          "acf_2_bws"   -> acfLevel3.toString
         )
       )
   }

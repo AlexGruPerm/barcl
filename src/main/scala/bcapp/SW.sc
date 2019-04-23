@@ -1,15 +1,88 @@
-
 //autocorrelation
+//Статистика. Часть 1. Теория статистики Авторы: Наталья Королькова, Инна Минина Стр. 181.
+case class tinyTick(db_tsunx :Long, ask :Double)
 
-case class tinyTick(db_tsunx  :Long,
-                    ask       :Double)
+val seqTicks = Seq(tinyTick(1,1.13449), tinyTick(2,1.13447), tinyTick(3,1.13444), tinyTick(4,1.13449),
+  tinyTick(5,1.13451), tinyTick(6,1.13459),  tinyTick(7,1.13469), tinyTick(8,1.13479), tinyTick(9,1.13489),  tinyTick(10,1.13499), tinyTick(11,1.13499),
+  tinyTick(12,1.13489), tinyTick(13,1.13479), tinyTick(14,1.13469), tinyTick(15,1.13459), tinyTick(16,1.13449), tinyTick(17,1.13439), tinyTick(18,1.13439), tinyTick(19,1.13449), tinyTick(20,1.13469), tinyTick(21,1.13489))
 
-val seqTicks = Seq(tinyTick(1,1.13449),  tinyTick(2,1.13447),  tinyTick(3,1.13444),
-  tinyTick(4,1.13449), tinyTick(5,1.13451), tinyTick(6,1.13459),  tinyTick(7,1.13469),
-  tinyTick(8,1.13479), tinyTick(9,1.13489),  tinyTick(10,1.13499), tinyTick(11,1.13499),
-  tinyTick(12,1.13489), tinyTick(13,1.13479), tinyTick(14,1.13469), tinyTick(15,1.13459),
-  tinyTick(16,1.13449), tinyTick(17,1.13439), tinyTick(18,1.13439),
-  tinyTick(29,1.13449), tinyTick(20,1.13469), tinyTick(21,1.13489))
+val srcN = seqTicks.size
+val acLevel = 1
+
+
+def getACFKoeff(seqTicks :Seq[tinyTick],acLevel :Int) :Double ={
+  val seqSrcX = seqTicks.drop(acLevel).map(_.ask)
+  val seqSrcY = seqTicks.take(srcN - acLevel).map(_.ask)
+
+  val n = seqSrcX.size
+
+  val avgX = seqSrcX.sum / n
+  val avgY = seqSrcY.sum / n
+
+  val avgXY = seqSrcX.zip(seqSrcY).map(elm => elm._1 * elm._2).sum / n
+  val prodAvgXY = avgX * avgY
+
+  val sigma2X = seqSrcX.map(e => Math.pow(e, 2)).sum / n - Math.pow(avgX, 2)
+  val sigma2Y = seqSrcY.map(e => Math.pow(e, 2)).sum / n - Math.pow(avgY, 2)
+
+  val r = (avgXY - prodAvgXY) / Math.sqrt(sigma2X * sigma2Y)
+  r
+}
+
+for(acl <- Range(1,4))
+  println(acl+" "+getACFKoeff(seqTicks,acl))
+
+
+
+
+
+//val seqLogCO  = seqTicks.zip(seqTicks.tail)
+// .map(thisPair => Math.log(thisPair._2.ask/thisPair._1.ask))
+
+/*
+
+val x = seqTicks.drop(acLevel).map
+val y = seqTicks.take(seqTicks.size - acLevel)
+val n = x.size
+
+val avgX = x.map(_).sum / n
+val avgY = seqAutoElms.map(elm => elm._2).sum/n
+val avgXY = seqAutoElms.map(elm => elm._1*elm._2).sum/n
+
+*/
+
+/*
+//-1.762922219907152E-5, -2.6444416042893746E-5, 4.407363824189353E-5,
+ 1 .7628911415075048E-5
+val seqLogCO  = seqTicks.zip(seqTicks.tail)
+  .map(thisPair => Math.log(thisPair._2.ask/thisPair._1.ask))
+seqLogCO.size
+
+// (-1.762922219907152E-5,-2.6444416042893746E-5),
+// (-2.6444416042893746E-5,4.407363824189353E-5)
+val seqAutoElms = seqLogCO.zip(seqLogCO.tail)
+val n = seqAutoElms.size
+
+val avgX = seqAutoElms.map(elm => elm._1).sum/n
+val avgY = seqAutoElms.map(elm => elm._2).sum/n
+val avgXY = seqAutoElms.map(elm => elm._1*elm._2).sum/n
+
+val s2X = seqAutoElms.map(elm => Math.pow(elm._1,2)).sum/n - avgX
+val s2Y = seqAutoElms.map(elm => Math.pow(elm._2,2)).sum/n - avgY
+
+val sX = Math.sqrt(s2X)
+val sY = Math.sqrt(s2Y)
+
+val r = (avgXY - avgX*avgY)/(s2X*s2Y)
+*/
+
+
+
+
+
+
+
+
 
 
 
