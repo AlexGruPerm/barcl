@@ -2,13 +2,23 @@ package bcapp
 
 import bcpackage.BarRangeCalculator
 import org.slf4j.LoggerFactory
+import com.typesafe.config.{Config, ConfigFactory}
+
+import collection.JavaConverters._
+import scala.collection.breakOut
+
+/*
+import collection.JavaConverters._
+import scala.collection.breakOut
+*/
 
 object BarsRanger extends App {
+  val config :Config = ConfigFactory.load(s"resources/application.conf")
 
   val logger = LoggerFactory.getLogger(getClass.getName)
-  val node: String = "10.241.5.234"
   val dbType: String = "cassandra"
-  val logOpenExit : Seq[Double] = Seq(0.0044) //Fut analyze search percents, price go up or down
+  val node: String =  config.getString(dbType+".connection.address")
+  val logOpenExit : Seq[Double] = config.getDoubleList("futanalyze.logco").asScala.map(_.doubleValue)(breakOut)
 
   try {
     (new BarRangeCalculator(node,logOpenExit)).run

@@ -12,29 +12,19 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
 
   def calcIteration(dbInst :DBImpl) = {
     val allBarsHistMeta :Seq[barsMeta] = dbInst.getAllBarsHistMeta
+    logger.debug("allBarsHistMeta.size="+allBarsHistMeta.size)
     allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.foreach {
        {//remove this breaket
         case (tickerID: Int, barWidthSec: Int) =>
+          logger.debug("BEFORE getLastBarFaTSEnd tickerID="+tickerID+" barWidthSec="+barWidthSec)
+
         val lastFaCalcedDdate: LocalDate = dbInst.getLastBarFaTSEnd(tickerID, barWidthSec) match {
           case Some(nnDdate) => nnDdate
           case None => allBarsHistMeta.filter(b => b.tickerId == tickerID && b.barWidthSec==barWidthSec).map(b => b.dDate).min
         }
+          logger.debug("lastFaCalcedDdate ="+lastFaCalcedDdate)
 
         //logger.debug("CHECK TSEND >>> (" + tickerID + "," + barWidthSec + ")  lastFaCalcedTsEnd=[" + lastFaCalcedDdate + "]")
-/*
-          logger.debug("AllDDATES=["+
-          allBarsHistMeta.filter(
-            r =>
-              r.tickerId == tickerID &&
-                r.barWidthSec == barWidthSec).size
-          +"] FILTEREDBY=["+
-          allBarsHistMeta.filter(
-            r =>
-              r.tickerId == tickerID &&
-                r.barWidthSec == barWidthSec &&
-                r.dDate.getDaysSinceEpoch >= lastFaCalcedDdate.getDaysSinceEpoch).size
-          +"]")
-*/
 
         val allBars: Seq[barsForFutAnalyze] = dbInst.getAllCalcedBars(allBarsHistMeta.filter(
           r =>
@@ -47,7 +37,10 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
 
         val prcntsDivSize = logOpenExit.size
         val t1FAnal = System.currentTimeMillis
-        val futAnalRes: Seq[barsFutAnalyzeRes] = logOpenExit.flatMap(p => dbInst.makeAnalyze(allBars, p))
+
+        val futAnalRes: Seq[barsFutAnalyzeRes] = logOpenExit//.filter(p => p == 0.0022)
+          .flatMap(p => dbInst.makeAnalyze(allBars, p))
+
         val t2FAnal = System.currentTimeMillis
         logger.debug("After analyze RES.size = " + futAnalRes.size + " Duration " + (t2FAnal - t1FAnal) + " msecs.")
 
@@ -86,10 +79,15 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
         val t2FS = System.currentTimeMillis
         logger.info("Duration of gathering resFSave - " + (t2FS - t1FS) + " msecs. SEND FOR SAVE ="+resFSave.size)
 
+
+
         val t1Save = System.currentTimeMillis
         dbInst.saveBarsFutAnal(resFSave)
         val t2Save = System.currentTimeMillis
         logger.info("Duration of saveing into mts_bars.bars_fa - " + (t2Save - t1Save) + " msecs.")
+
+
+
       //logger.debug("==========================================================")
 
     }
