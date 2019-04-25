@@ -641,14 +641,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
     */
   def makeAnalyze(seqB: Seq[barsForFutAnalyze], p: Double): Seq[barsFutAnalyzeRes] = {
-
-    /*
-    val pUp = 1 + p / 100
-    val pDw = 1 - p / 100
-    */
-
-    logger.debug(" >>> inside makeAnalyze for p="+p+" and seqB.SIZE="+seqB.size)
-    val t1 = System.currentTimeMillis
+    //logger.debug(" >>> inside makeAnalyze for p="+p+" and seqB.SIZE="+seqB.size)
+    //val t1 = System.currentTimeMillis
 
     def fCheckCritMax(currBar: barsForFutAnalyze, srcElm: barsForFutAnalyze): Boolean ={
       val pUp :Double = (Math.exp( Math.log(currBar.c) + p)* 10000).round / 10000.toDouble
@@ -689,10 +683,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       (fbMax match {
         case 0L =>
           searchSeq
-            .find(srcElm => fCheckCritMin(currBar,srcElm))//.headOption
+            .find(srcElm => fCheckCritMin(currBar,srcElm))
         case x:Long =>
           searchSeq.filter(srcElm => (srcElm.ts_end > currBar.ts_end && srcElm.ts_end < x))
-            .find(srcElm => fCheckCritMin(currBar,srcElm))//.headOption
+            .find(srcElm => fCheckCritMin(currBar,srcElm))
       })
       match {
         case Some(foundedBar) => foundedBar.ts_end
@@ -702,13 +696,13 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     val fbBoth :Long =
       ((fbMin,fbMax) match {
         case (0L, 0L)             => searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))//.headOption
+          .find(srcElm => fCheckCritBoth(currBar,srcElm))
         case (mn :Long, 0L)       =>searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))//.headOption
+          .find(srcElm => fCheckCritBoth(currBar,srcElm))
         case (0L, mx :Long)       =>searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))//.headOption
+          .find(srcElm => fCheckCritBoth(currBar,srcElm))
         case (mn :Long, mx :Long) =>searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))//.headOption
+          .find(srcElm => fCheckCritBoth(currBar,srcElm))
       })
       match {
         case Some(foundedBar) => foundedBar.ts_end
@@ -719,7 +713,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
     val aFoundedAllMin :Long = aFoundedAll.map(elm => elm._2).reduceOption(_ min _).getOrElse(0L)
 
-    val aFounded :Option[(String,Long)] = aFoundedAll.find(e => e._2 == aFoundedAllMin)//.headOption
+    val aFounded :Option[(String,Long)] = aFoundedAll.find(e => e._2 == aFoundedAllMin)
 
     aFounded match {
       case Some(bar) =>
@@ -733,8 +727,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         )
     }
   }
-    val t2 = System.currentTimeMillis
-    logger.debug(" <<< inside makeAnalyze  Result r.size="+r.size+" analyze duration = "+(t2 - t1) + " msecs.")
+    //val t2 = System.currentTimeMillis
+    //logger.debug(" <<< inside makeAnalyze  Result r.size="+r.size+" analyze duration = "+(t2 - t1) + " msecs.")
     r
   }
 

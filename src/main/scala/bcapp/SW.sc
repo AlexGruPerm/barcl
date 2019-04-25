@@ -1,3 +1,9 @@
+
+
+Seq(0,1,2,3,4,5).find
+
+
+/*
 //autocorrelation
 //Статистика. Часть 1. Теория статистики Авторы: Наталья Королькова, Инна Минина Стр. 181.
 case class tinyTick(db_tsunx :Long, ask :Double)
@@ -32,7 +38,7 @@ def getACFKoeff(seqTicks :Seq[tinyTick],acLevel :Int) :Double ={
 for(acl <- Range(1,4))
   println(acl+" "+getACFKoeff(seqTicks,acl))
 
-
+*/
 
 
 
