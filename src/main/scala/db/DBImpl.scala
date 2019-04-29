@@ -376,12 +376,12 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       val lb: Option[LastBar] = (session.execute(bndLastBar
         .setInt("tickerId", rowCP.getInt("ticker_id"))
         .setInt("barDeepSec", rowCP.getInt("bar_width_sec"))
-        .setDate("maxDdate", (maxDdate match {
+        .setDate("maxDdate", maxDdate match {
           case null => core.LocalDate.fromMillisSinceEpoch(0)
           case lDate: LocalDate => lDate
-        }))
+        })
       ).all().iterator.asScala.toSeq map (row => {
-        new LastBar(
+        LastBar(
           row.getLong("ts_end")
         )
       })).headOption
@@ -410,9 +410,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       }
 
       def firstTickTS: Option[Long] = {
-        (session.execute(bndFirstTickDdate
-          .setInt("tickerId", rowCP.getInt("ticker_id"))
-        ).all().iterator.asScala.toSeq map (row => row.getDate("ddate")) filter (ld => ld != null)).headOption
+        //(
+          session.execute(bndFirstTickDdate
+          .setInt("tickerId", rowCP.getInt("ticker_id")))
+          .all().iterator.asScala.toSeq map (row => row.getDate("ddate")) find (ld => ld != null) //filter (ld => ld != null)).headOption
         match {
           case Some(firstDdate) => {
             //logger.debug("----------------- firstDdate inside firstTickTS  is = "+firstDdate)
@@ -426,7 +427,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         }
       }
 
-      new CalcProperty(
+       CalcProperty(
         rowCP.getInt("ticker_id"),
         rowCP.getInt("bar_width_sec"),
         rowCP.getInt("is_enabled"),
@@ -449,7 +450,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
 
   val rowToSeqTicks = (rowT: Row, tickerID: Int) => {
-    new Tick(
+     Tick(
       tickerID,
       rowT.getDate("ddate"),
       rowT.getLong("db_tsunx"),
@@ -459,14 +460,14 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
   val rowToBarMeta = (row: Row) => {
-    new barsMeta(
+     barsMeta(
       row.getInt("ticker_id"),
       row.getInt("bar_width_sec"),
       row.getDate("ddate"))
   }
 
   val rowToBarData = (row: Row, tickerID: Int, barWidthSec: Int, dDate: LocalDate) => {
-    new barsForFutAnalyze(
+     barsForFutAnalyze(
       tickerID,
       barWidthSec,
       dDate,
@@ -480,7 +481,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
   val rowToBarFAMeta = (row: Row) => {
-    new barsFaMeta(
+     barsFaMeta(
       row.getInt("ticker_id"),
       row.getInt("bar_width_sec"),
       row.getDate("ddate"),
@@ -489,7 +490,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
   val rowToBarFAData = (row: Row, tickerID: Int, barWidthSec: Int, dDate: LocalDate) => {
-    new barsResToSaveDB(
+     barsResToSaveDB(
       tickerID,
       dDate,
       barWidthSec,
@@ -505,7 +506,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
   val rowToTinyTick = (row: Row) => {
-    new tinyTick(
+     tinyTick(
       row.getLong("db_tsunx"),
       row.getDouble("ask"),
       row.getDouble("bid")
@@ -526,9 +527,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     ).all().iterator.asScala.toSeq.map(r => rowToSeqTicks(r, cp.tickerId)).sortBy(t => t.db_tsunx)
     )
     val t2 = System.currentTimeMillis
-    (sqt, (t2 - t1))
     logger.debug("Inside getTicksByInterval. Read interval " + tsBegin + " - " + tsEnd + " diration=" + (t2 - t1) + " Ticks Size=" + sqt.sqTicks.size)
-    (sqt, (t2 - t1))
+    (sqt, t2 - t1)
   }
 
 
@@ -549,7 +549,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     val seqBarSides = barsSides.zipWithIndex.map(elm => (elm._1, elm._2))
     logger.debug("seqBarSides.size= " + seqBarSides.size)
 
-    val seqBar2Sides = for (i <- 0 to seqBarSides.size - 1) yield {
+    val seqBar2Sides = for (i <- seqBarSides.indices/*0 to seqBarSides.size - 1*/) yield {
       if (i < seqBarSides.last._2)
         (seqBarSides(i)._1, seqBarSides(i + 1)._1, seqBarSides(i)._2 + 1)
       else
@@ -557,7 +557,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     }
 
     def getGroupThisElement(elm: Long) = {
-      seqBar2Sides.find(bs => ((bs._1 <= elm && bs._2 > elm) && (bs._2 - bs._1) == barDeepSec)).map(x => x._3).getOrElse(0)
+      seqBar2Sides.find(bs => (bs._1 <= elm && bs._2 > elm) && (bs._2 - bs._1) == barDeepSec).map(x => x._3).getOrElse(0)
     }
 
     val seqSeqTicks: Seq[(Int, Seq[Tick])] = seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx)).filter(seqT => seqT._1 != 0).toSeq.sortBy(gr => gr._1)
@@ -571,7 +571,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
 
-  def saveBars(seqBarsCalced: Seq[Bar]) = {
+  def saveBars(seqBarsCalced: Seq[Bar]) :Unit = {
     require(seqBarsCalced.nonEmpty, "Seq of Bars for saving is Empty.")
 
     for (b <- seqBarsCalced) {
@@ -641,39 +641,41 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
     */
   def makeAnalyze(seqB: Seq[barsForFutAnalyze], p: Double): Seq[barsFutAnalyzeRes] = {
-    //logger.debug(" >>> inside makeAnalyze for p="+p+" and seqB.SIZE="+seqB.size)
+
+    logger.debug(" >>>>>>>>>>>>>>>>> inside makeAnalyze for p="+p+" and seqB.SIZE="+seqB.size)
     //val t1 = System.currentTimeMillis
 
-    def fCheckCritMax(currBar: barsForFutAnalyze, srcElm: barsForFutAnalyze): Boolean ={
-      val pUp :Double = (Math.exp( Math.log(currBar.c) + p)* 10000).round / 10000.toDouble
-      pUp >= srcElm.minOHLC && pUp <= srcElm.maxOHLC
-  }
+    def fCheckCritMax(currBarC :Double, /*srcElm: barsForFutAnalyze*/ srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
+      val pUp :Double = (Math.exp( Math.log(currBarC) + p)* 10000).round / 10000.toDouble
+      pUp >= srcElmMinOHLC && pUp <= srcElmMaxOHLC
+    }
 
-  def fCheckCritMin(currBar: barsForFutAnalyze, srcElm: barsForFutAnalyze): Boolean ={
-    val pDw :Double = (Math.exp( Math.log(currBar.c) - p)* 10000).round / 10000.toDouble
-    pDw >= srcElm.minOHLC && pDw <= srcElm.maxOHLC
-  }
+    def fCheckCritMin(currBarC :Double, /*srcElm: barsForFutAnalyze*/ srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
+      val pDw :Double = (Math.exp( Math.log(currBarC) - p)* 10000).round / 10000.toDouble
+      pDw >= srcElmMinOHLC && pDw <= srcElmMaxOHLC
+    }
 
-    def fCheckCritBoth (currBar :barsForFutAnalyze,  srcElm:barsForFutAnalyze) :Boolean ={
-      val pUp :Double = (Math.exp( Math.log(currBar.c) + p)* 10000).round / 10000.toDouble
-      val pDw :Double = (Math.exp( Math.log(currBar.c) - p)* 10000).round / 10000.toDouble
-      pUp <= srcElm.maxOHLC && pDw >= srcElm.minOHLC
+    def fCheckCritBoth (currBarC :Double, /*srcElm: barsForFutAnalyze*/ srcElmMinOHLC :Double, srcElmMaxOHLC:Double) :Boolean ={
+      val pUp :Double = (Math.exp( Math.log(currBarC) + p)* 10000).round / 10000.toDouble
+      val pDw :Double = (Math.exp( Math.log(currBarC) - p)* 10000).round / 10000.toDouble
+      pUp <= srcElmMaxOHLC && pDw >= srcElmMinOHLC
     }
 
 
+
+
   val r = for (
-    currBar <- seqB;
+    currBarWithIndex <- seqB.zipWithIndex;
     /**
       Optimization: drop is faster
     searchSeq = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
      OR
     */
-    idxDrop = seqB.indexOf(currBar);
-    searchSeq = seqB.drop(idxDrop+1)
+    currBar = currBarWithIndex._1;
+    searchSeq = seqB.drop(currBarWithIndex._2+1)
   ) yield {
 
-    val fbMax :Long = searchSeq
-      .find(srcElm => fCheckCritMax(currBar,srcElm))//.headOption
+    val fbMax :Long = searchSeq.find(srcElm => fCheckCritMax(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
     match {
       case Some(foundedBar) => foundedBar.ts_end
       case None => 0L
@@ -683,46 +685,34 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       (fbMax match {
         case 0L =>
           searchSeq
-            .find(srcElm => fCheckCritMin(currBar,srcElm))
-        case x:Long =>
-          searchSeq.filter(srcElm => (srcElm.ts_end > currBar.ts_end && srcElm.ts_end < x))
-            .find(srcElm => fCheckCritMin(currBar,srcElm))
+            .find(srcElm => fCheckCritMin(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
+        case x:Long => searchSeq.withFilter(srcElm => srcElm.ts_end > currBar.ts_end && srcElm.ts_end < x)
+          .map(elm => elm)
+          .find(srcElm => fCheckCritMin(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
       })
       match {
         case Some(foundedBar) => foundedBar.ts_end
         case None => 0L
       }
 
-    val fbBoth :Long =
-      ((fbMin,fbMax) match {
-        case (0L, 0L)             => searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))
-        case (mn :Long, 0L)       =>searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))
-        case (0L, mx :Long)       =>searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))
-        case (mn :Long, mx :Long) =>searchSeq
-          .find(srcElm => fCheckCritBoth(currBar,srcElm))
-      })
+    val fbBoth :Long = searchSeq.find(srcElm => fCheckCritBoth(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
       match {
         case Some(foundedBar) => foundedBar.ts_end
         case None => 0L
     }
 
     val aFoundedAll :Seq[(String,Long)] = Seq(("mx",fbMax),("mn",fbMin),("bt",fbBoth)).filter(e => e._2!=0L)
-
     val aFoundedAllMin :Long = aFoundedAll.map(elm => elm._2).reduceOption(_ min _).getOrElse(0L)
-
     val aFounded :Option[(String,Long)] = aFoundedAll.find(e => e._2 == aFoundedAllMin)
 
     aFounded match {
       case Some(bar) =>
-        new barsFutAnalyzeRes(
+        barsFutAnalyzeRes(
           currBar, searchSeq.find(b => b.ts_end == bar._2),
           p, bar._1
         )
       case None =>
-        new barsFutAnalyzeRes(
+        barsFutAnalyzeRes(
           currBar, None, p , "nn"
         )
     }
@@ -738,9 +728,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * Save results of Future analyze into DB mts_bars.bars_fa
     */
-  def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB]) = {
+  def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB]) :Unit = {
 
-    val partsSeqBarFa = seqFA.grouped(50)//other limit 65535 for tiny rows.
+    val partsSeqBarFa = seqFA.grouped(100)//other limit 65535 for tiny rows.
 
     for(thisPartOfSeq <- partsSeqBarFa) {
       //logger.debug("INSIDE [saveBarsFutAnal] SIZE OF thisPartOfSeq = "+thisPartOfSeq.size)
@@ -820,7 +810,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
     minDdateTs match {
       case (Some(minDdate),tsEndBegin : Long) =>
-        seqB.filter(b => (b.dDate.getMillisSinceEpoch >= minDdate.getMillisSinceEpoch))
+        seqB.filter(b => b.dDate.getMillisSinceEpoch >= minDdate.getMillisSinceEpoch)
           .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd
             .setInt("p_ticker_id", sb.tickerId)
             .setInt("p_bar_width_sec", sb.barWidthSec)

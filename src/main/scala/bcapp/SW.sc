@@ -1,6 +1,14 @@
 
+val seq = Seq(10,12,23,15,17,20)
 
-Seq(0,1,2,3,4,5).find
+/*
+seq.indexOf(10)
+seq.zipWithIndex
+*/
+
+seq.indices
+
+seq.size-1
 
 
 /*

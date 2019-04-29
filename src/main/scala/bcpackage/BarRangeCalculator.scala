@@ -6,6 +6,14 @@ import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+
+//import scala.concurrent.duration.Duration
+//import scala.concurrent.{Await, Future}
+//import scala.concurrent.ExecutionContext.Implicits.global
+
 class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
   val logger = LoggerFactory.getLogger(getClass.getName)
   implicit val localDateOrdering: Ordering[LocalDate] = Ordering.by(_.getDaysSinceEpoch)
@@ -38,8 +46,11 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
         val prcntsDivSize = logOpenExit.size
         val t1FAnal = System.currentTimeMillis
 
-        val futAnalRes: Seq[barsFutAnalyzeRes] = logOpenExit//.filter(p => p == 0.0022)
-          .flatMap(p => dbInst.makeAnalyze(allBars, p))
+          // NO PARALLEL : val futAnalRes: Seq[barsFutAnalyzeRes] = logOpenExit.flatMap(p => dbInst.makeAnalyze(allBars, p))
+          // Run makeAnalyze parallel, for each  logOE in logOpenExit
+          val futuresFutAnalRes :Seq[Future[Seq[barsFutAnalyzeRes]]] = logOpenExit.map(p => Future{dbInst.makeAnalyze(allBars, p)})
+          val values = Future.sequence(futuresFutAnalRes)
+          val futAnalRes: Seq[barsFutAnalyzeRes] = Await.result(values,Duration.Inf).flatten //wait results and flat it into one seq.
 
         val t2FAnal = System.currentTimeMillis
         logger.debug("After analyze RES.size = " + futAnalRes.size + " Duration " + (t2FAnal - t1FAnal) + " msecs.")
@@ -51,7 +62,7 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
           **/
 
         val resFSave: Seq[barsResToSaveDB] = futAnalRes
-          .sortBy(t => t.srcBar.ts_end)
+          //.sortBy(t => t.srcBar.ts_end)
           .filter(elm => elm.resAnal.isDefined)
           .map(r => new barsResToSaveDB(
             r.srcBar.tickerId,
@@ -60,7 +71,6 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
             r.srcBar.ts_end,
             r.srcBar.c,
             r.p,
-            //r.srcBar.ts_end, //we don't need None cases if we use filter(elm => elm.resAnal.isDefined)
             r.resAnal match {
               case Some(ri) => ri.ts_end
             },
