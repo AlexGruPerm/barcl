@@ -1,6 +1,6 @@
 package db
 
-import bcstruct.{barsForFutAnalyze, barsMeta, barsResToSaveDB, _}
+import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta, barsResToSaveDB, _}
 import com.datastax.driver.core
 import com.datastax.driver.core.exceptions.NoHostAvailableException
 import com.datastax.driver.core._
@@ -641,84 +641,27 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
     */
   def makeAnalyze(seqB: Seq[barsForFutAnalyze], p: Double): Seq[barsFutAnalyzeRes] = {
-    // val t1 = System.currentTimeMillis
-    def fCheckCritMax(currBarC :Double, srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
-      val pUp :Double = (Math.exp( Math.log(currBarC) + p)* 10000).round / 10000.toDouble
-      pUp >= srcElmMinOHLC && pUp <= srcElmMaxOHLC
-    }
-
-    def fCheckCritMin(currBarC :Double, srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
-      val pDw :Double = (Math.exp( Math.log(currBarC) - p)* 10000).round / 10000.toDouble
-      pDw >= srcElmMinOHLC && pDw <= srcElmMaxOHLC
-    }
-
-    /*
-    def fCheckCritBoth (currBarC :Double, srcElmMinOHLC :Double, srcElmMaxOHLC:Double) :Boolean ={
-      val pUp :Double = (Math.exp( Math.log(currBarC) + p)* 10000).round / 10000.toDouble
-      val pDw :Double = (Math.exp( Math.log(currBarC) - p)* 10000).round / 10000.toDouble
-      pUp <= srcElmMaxOHLC && pDw >= srcElmMinOHLC
-    }
-    */
-
-  val r = for (
-    currBarWithIndex <- seqB.zipWithIndex;
-    /**
-      Optimization: drop is faster
-    searchSeq = seqB.filter(srcElm => srcElm.ts_end > currBar.ts_end)
-     OR
-    */
-    currBar = currBarWithIndex._1;
-    searchSeq = seqB.drop(currBarWithIndex._2+1)
+    for (
+      currBarWithIndex <- seqB.zipWithIndex;
+      currBar = currBarWithIndex._1;
+      searchSeq = seqB.drop(currBarWithIndex._2+1)
   ) yield {
+    val pUp :Double = (Math.exp( Math.log(currBar.c) + p)* 10000).round / 10000.toDouble
+    val pDw :Double = (Math.exp( Math.log(currBar.c) - p)* 10000).round / 10000.toDouble
 
-    val fbMax :Long =
-      searchSeq.find(srcElm => fCheckCritMax(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
-    match {
-      case Some(foundedBar) => foundedBar.ts_end
-      case None => 0L
-    }
-
-    val fbMin :Long =
-      (fbMax match {
-        case 0L =>
-          searchSeq
-            .find(srcElm => fCheckCritMin(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
-        case x:Long => searchSeq.withFilter(srcElm => srcElm.ts_end > currBar.ts_end && srcElm.ts_end < x)
-          .map(elm => elm)
-          .find(srcElm => fCheckCritMin(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
-      })
-      match {
-        case Some(foundedBar) => foundedBar.ts_end
-        case None => 0L
+    searchSeq.find(srcElm => (pUp >= srcElm.minOHLC && pUp <= srcElm.maxOHLC) ||
+                      (pDw >= srcElm.minOHLC && pDw <= srcElm.maxOHLC) ||
+                      (pUp <= srcElm.maxOHLC && pDw >= srcElm.minOHLC)
+      ) match {
+      case Some(fBar) => {
+        if (pUp >= fBar.minOHLC && pUp <= fBar.maxOHLC) barsFutAnalyzeRes(currBar,Some(fBar),p,"mx")
+        else if (pDw >= fBar.minOHLC && pDw <= fBar.maxOHLC) barsFutAnalyzeRes(currBar,Some(fBar),p,"mn")
+        else if (pUp <= fBar.maxOHLC && pDw >= fBar.minOHLC) barsFutAnalyzeRes(currBar,Some(fBar),p,"bt")
+         else barsFutAnalyzeRes(currBar,None,p,"nn")
       }
-
-    /*
-    val fbBoth :Long = searchSeq.find(srcElm => fCheckCritBoth(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
-      match {
-        case Some(foundedBar) => foundedBar.ts_end
-        case None => 0L
+      case None => barsFutAnalyzeRes(currBar,None,p,"nn")
     }
-    */
-
-    val aFoundedAll :Seq[(String,Long)] = Seq(("mx",fbMax),("mn",fbMin)/*,("bt",fbBoth)*/).filter(e => e._2!=0L)
-    val aFoundedAllMin :Long = aFoundedAll.map(elm => elm._2).reduceOption(_ min _).getOrElse(0L)
-    val aFounded :Option[(String,Long)] = aFoundedAll.find(e => e._2 == aFoundedAllMin)
-
-    aFounded match {
-      case Some(bar) =>
-        barsFutAnalyzeRes(
-          currBar, searchSeq.find(b => b.ts_end == bar._2),
-          p, bar._1
-        )
-      case None =>
-        barsFutAnalyzeRes(
-          currBar, None, p , "nn"
-        )
     }
-  }
-    //val t2 = System.currentTimeMillis
-    //logger.debug("INSIDE makeAnalyze Result r.size="+r.size+" p="+p+" analyze duration = "+(t2 - t1) + " msecs.")
-    r
   }
 
 
