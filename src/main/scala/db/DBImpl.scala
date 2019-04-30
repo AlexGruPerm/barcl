@@ -604,7 +604,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     */
   def getAllBarsHistMeta: Seq[barsMeta] = {
     session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-      //.filter(r => Seq(8).contains(r.tickerId) && Seq(30/*300,600,1800,3600*/).contains(r.barWidthSec)) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+      .filter(r => Seq(8).contains(r.tickerId) && Seq(30/*300,600,1800,3600*/).contains(r.barWidthSec)) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -671,7 +671,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     searchSeq = seqB.drop(currBarWithIndex._2+1)
   ) yield {
 
-    val fbMax :Long = searchSeq.find(srcElm => fCheckCritMax(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
+    val fbMax :Long =
+      searchSeq.find(srcElm => fCheckCritMax(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
     match {
       case Some(foundedBar) => foundedBar.ts_end
       case None => 0L
