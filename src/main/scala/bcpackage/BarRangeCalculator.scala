@@ -20,17 +20,17 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
 
   def calcIteration(dbInst :DBImpl) = {
     val allBarsHistMeta :Seq[barsMeta] = dbInst.getAllBarsHistMeta
-    logger.debug("allBarsHistMeta.size="+allBarsHistMeta.size)
+    logger.info("allBarsHistMeta.size="+allBarsHistMeta.size)
     allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.foreach {
        {//remove this breaket
         case (tickerID: Int, barWidthSec: Int) =>
-          logger.debug("BEFORE getLastBarFaTSEnd tickerID="+tickerID+" barWidthSec="+barWidthSec)
+          logger.info("BEFORE getLastBarFaTSEnd tickerID="+tickerID+" barWidthSec="+barWidthSec)
 
         val lastFaCalcedDdate: LocalDate = dbInst.getLastBarFaTSEnd(tickerID, barWidthSec) match {
           case Some(nnDdate) => nnDdate
           case None => allBarsHistMeta.filter(b => b.tickerId == tickerID && b.barWidthSec==barWidthSec).map(b => b.dDate).min
         }
-          logger.debug("lastFaCalcedDdate ="+lastFaCalcedDdate)
+          logger.info("lastFaCalcedDdate ="+lastFaCalcedDdate)
 
         //logger.debug("CHECK TSEND >>> (" + tickerID + "," + barWidthSec + ")  lastFaCalcedTsEnd=[" + lastFaCalcedDdate + "]")
         val tRead1 = System.currentTimeMillis
@@ -40,9 +40,9 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
             r.barWidthSec == barWidthSec &&
             r.dDate.getDaysSinceEpoch >= lastFaCalcedDdate.getDaysSinceEpoch))
           val tRead2 = System.currentTimeMillis
-          logger.debug("Read all bars Duration = "+(tRead2 - tRead1) + " msecs.")
+          logger.info("Read all bars Duration = "+(tRead2 - tRead1) + " msecs.")
 
-        logger.debug("allBars BY [" + tickerID + "," + barWidthSec + "] SIZE = " + allBars.size + "  (" + allBars.head.ts_end + " - " + allBars.last.ts_end + ") " +
+        logger.info("allBars BY [" + tickerID + "," + barWidthSec + "] SIZE = " + allBars.size + "  (" + allBars.head.ts_end + " - " + allBars.last.ts_end + ") " +
           " (" + allBars.head.dDate + " - " + allBars.last.dDate + ") SIZE=" + SizeEstimator.estimate(dbInst) + " bytes.")
 
         val prcntsDivSize = logOpenExit.size
@@ -52,7 +52,7 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
           val values = Future.sequence(futuresFutAnalRes)
           val futAnalRes: Seq[barsFutAnalyzeRes] = Await.result(values,Duration.Inf).flatten //wait results and flat it into one seq.
         val t2FAnal = System.currentTimeMillis
-        logger.debug("After analyze RES.size = " + futAnalRes.size + " Duration " + (t2FAnal - t1FAnal) + " msecs.")
+        logger.info("After analyze RES.size = " + futAnalRes.size + " Duration " + (t2FAnal - t1FAnal) + " msecs.")
 
         val t1FS = System.currentTimeMillis
 
