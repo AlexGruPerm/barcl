@@ -604,7 +604,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     */
   def getAllBarsHistMeta: Seq[barsMeta] = {
     session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-      //.filter(r => Seq(1).contains(r.tickerId) && Seq(30/*300,600,1800,3600*/).contains(r.barWidthSec)) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+      //.filter(r => Seq(8).contains(r.tickerId) && Seq(30/*300,600,1800,3600*/).contains(r.barWidthSec)) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -641,28 +641,24 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
     */
   def makeAnalyze(seqB: Seq[barsForFutAnalyze], p: Double): Seq[barsFutAnalyzeRes] = {
-
-    logger.debug(" >>>>>>>>>>>>>>>>> inside makeAnalyze for p="+p+" and seqB.SIZE="+seqB.size)
-    //val t1 = System.currentTimeMillis
-
-    def fCheckCritMax(currBarC :Double, /*srcElm: barsForFutAnalyze*/ srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
+    // val t1 = System.currentTimeMillis
+    def fCheckCritMax(currBarC :Double, srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
       val pUp :Double = (Math.exp( Math.log(currBarC) + p)* 10000).round / 10000.toDouble
       pUp >= srcElmMinOHLC && pUp <= srcElmMaxOHLC
     }
 
-    def fCheckCritMin(currBarC :Double, /*srcElm: barsForFutAnalyze*/ srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
+    def fCheckCritMin(currBarC :Double, srcElmMinOHLC :Double, srcElmMaxOHLC:Double): Boolean ={
       val pDw :Double = (Math.exp( Math.log(currBarC) - p)* 10000).round / 10000.toDouble
       pDw >= srcElmMinOHLC && pDw <= srcElmMaxOHLC
     }
 
-    def fCheckCritBoth (currBarC :Double, /*srcElm: barsForFutAnalyze*/ srcElmMinOHLC :Double, srcElmMaxOHLC:Double) :Boolean ={
+    /*
+    def fCheckCritBoth (currBarC :Double, srcElmMinOHLC :Double, srcElmMaxOHLC:Double) :Boolean ={
       val pUp :Double = (Math.exp( Math.log(currBarC) + p)* 10000).round / 10000.toDouble
       val pDw :Double = (Math.exp( Math.log(currBarC) - p)* 10000).round / 10000.toDouble
       pUp <= srcElmMaxOHLC && pDw >= srcElmMinOHLC
     }
-
-
-
+    */
 
   val r = for (
     currBarWithIndex <- seqB.zipWithIndex;
@@ -695,13 +691,15 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         case None => 0L
       }
 
+    /*
     val fbBoth :Long = searchSeq.find(srcElm => fCheckCritBoth(currBar.c,srcElm.minOHLC,srcElm.maxOHLC))
       match {
         case Some(foundedBar) => foundedBar.ts_end
         case None => 0L
     }
+    */
 
-    val aFoundedAll :Seq[(String,Long)] = Seq(("mx",fbMax),("mn",fbMin),("bt",fbBoth)).filter(e => e._2!=0L)
+    val aFoundedAll :Seq[(String,Long)] = Seq(("mx",fbMax),("mn",fbMin)/*,("bt",fbBoth)*/).filter(e => e._2!=0L)
     val aFoundedAllMin :Long = aFoundedAll.map(elm => elm._2).reduceOption(_ min _).getOrElse(0L)
     val aFounded :Option[(String,Long)] = aFoundedAll.find(e => e._2 == aFoundedAllMin)
 
@@ -718,7 +716,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     }
   }
     //val t2 = System.currentTimeMillis
-    //logger.debug(" <<< inside makeAnalyze  Result r.size="+r.size+" analyze duration = "+(t2 - t1) + " msecs.")
+    //logger.debug("INSIDE makeAnalyze Result r.size="+r.size+" p="+p+" analyze duration = "+(t2 - t1) + " msecs.")
     r
   }
 

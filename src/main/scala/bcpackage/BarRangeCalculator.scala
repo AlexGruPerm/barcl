@@ -33,25 +33,24 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
           logger.debug("lastFaCalcedDdate ="+lastFaCalcedDdate)
 
         //logger.debug("CHECK TSEND >>> (" + tickerID + "," + barWidthSec + ")  lastFaCalcedTsEnd=[" + lastFaCalcedDdate + "]")
-
+        val tRead1 = System.currentTimeMillis
         val allBars: Seq[barsForFutAnalyze] = dbInst.getAllCalcedBars(allBarsHistMeta.filter(
           r =>
             r.tickerId == tickerID &&
             r.barWidthSec == barWidthSec &&
             r.dDate.getDaysSinceEpoch >= lastFaCalcedDdate.getDaysSinceEpoch))
+          val tRead2 = System.currentTimeMillis
+          logger.debug("Read all bars Duration = "+(tRead2 - tRead1) + " msecs.")
 
         logger.debug("allBars BY [" + tickerID + "," + barWidthSec + "] SIZE = " + allBars.size + "  (" + allBars.head.ts_end + " - " + allBars.last.ts_end + ") " +
           " (" + allBars.head.dDate + " - " + allBars.last.dDate + ") SIZE=" + SizeEstimator.estimate(dbInst) + " bytes.")
 
         val prcntsDivSize = logOpenExit.size
-        val t1FAnal = System.currentTimeMillis
 
-          // NO PARALLEL : val futAnalRes: Seq[barsFutAnalyzeRes] = logOpenExit.flatMap(p => dbInst.makeAnalyze(allBars, p))
-          // Run makeAnalyze parallel, for each  logOE in logOpenExit
+        val t1FAnal = System.currentTimeMillis
           val futuresFutAnalRes :Seq[Future[Seq[barsFutAnalyzeRes]]] = logOpenExit.map(p => Future{dbInst.makeAnalyze(allBars, p)})
           val values = Future.sequence(futuresFutAnalRes)
           val futAnalRes: Seq[barsFutAnalyzeRes] = Await.result(values,Duration.Inf).flatten //wait results and flat it into one seq.
-
         val t2FAnal = System.currentTimeMillis
         logger.debug("After analyze RES.size = " + futAnalRes.size + " Duration " + (t2FAnal - t1FAnal) + " msecs.")
 
