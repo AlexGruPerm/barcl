@@ -22,7 +22,6 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
     val allBarsHistMeta :Seq[barsMeta] = dbInst.getAllBarsHistMeta
     logger.info("allBarsHistMeta.size="+allBarsHistMeta.size)
     allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.foreach {
-       {//remove this breaket
         case (tickerID: Int, barWidthSec: Int) =>
           logger.info("BEFORE getLastBarFaTSEnd tickerID="+tickerID+" barWidthSec="+barWidthSec)
 
@@ -32,7 +31,6 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
         }
           logger.info("lastFaCalcedDdate ="+lastFaCalcedDdate)
 
-        //logger.debug("CHECK TSEND >>> (" + tickerID + "," + barWidthSec + ")  lastFaCalcedTsEnd=[" + lastFaCalcedDdate + "]")
         val tRead1 = System.currentTimeMillis
         val allBars: Seq[barsForFutAnalyze] = dbInst.getAllCalcedBars(allBarsHistMeta.filter(
           r =>
@@ -88,18 +86,11 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
         val t2FS = System.currentTimeMillis
         logger.info("Duration of gathering resFSave - " + (t2FS - t1FS) + " msecs. SEND FOR SAVE ="+resFSave.size)
 
-
-
         val t1Save = System.currentTimeMillis
         dbInst.saveBarsFutAnal(resFSave)
         val t2Save = System.currentTimeMillis
         logger.info("Duration of saveing into mts_bars.bars_fa - " + (t2Save - t1Save) + " msecs.")
 
-
-
-      //logger.debug("==========================================================")
-
-    }
     }
   }
 

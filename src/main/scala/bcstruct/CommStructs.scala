@@ -239,14 +239,18 @@ object bForm {
     val n = 10
     val rngCStep = (formCMax-formCMin)/n
 
-    val rngC = formCMin.to(formCMax).by(rngCStep)
-    val rangesC = rngC.zip(rngC.tail)
+    if (rngCStep != 0) {
+      val rngC = formCMin.to(formCMax).by(rngCStep)
+      val rangesC = rngC.zip(rngC.tail)
 
-    val rangeFreq :Seq[(Double,Int)] = rangesC.map(rng =>
-      (rng._1, seqTicks.count(t => t.ask >= rng._1 && t.ask <= rng._2)))
-
-    rangeFreq.maxBy(r => r._2)._1
+      val rangeFreq: Seq[(Double, Int)] = rangesC.map(rng =>
+        (rng._1, seqTicks.count(t => t.ask >= rng._1 && t.ask <= rng._2)))
+      rangeFreq.maxBy(r => r._2)._1
+    } else formCMin
   }
+
+
+
 
   def create(barFa        :barsResToSaveDB,//barsFaData,
              formDeepKoef :Int,
@@ -297,16 +301,20 @@ object bForm {
           val c2 = c1 + deltaC
           val c3 = c2 + deltaC
           val c4 = formCMax
+
           val fc1: Int = if (formBeginC >= c1 && formBeginC <= c2) 3
           else if (formBeginC >= c2 && formBeginC < c3) 2
           else 1
+
           val fc3: Int = if (formEndC >= c1 && formEndC <= c2) 3
           else if (formEndC >= c2 && formEndC < c3) 2
           else 1
+
           val cMaxRo: Double = getMaxRo(seqTicks)
           val fc2: Int = if (cMaxRo >= c1 && cMaxRo <= c2) 3
           else if (cMaxRo >= c2 && cMaxRo < c3) 2
           else 1
+
           fc1 * 100 + fc2 * 10 + fc3
         }
       }

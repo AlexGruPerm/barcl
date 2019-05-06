@@ -14,8 +14,8 @@ import scala.collection.breakOut
 
 object BarsRanger extends App {
   val config :Config = ConfigFactory.load(s"resources/application.conf")
-
   val logger = LoggerFactory.getLogger(getClass.getName)
+
   val dbType: String = "cassandra"
   val node: String =  config.getString(dbType+".connection.address")
   val logOpenExit : Seq[Double] = config.getDoubleList("futanalyze.logco").asScala.map(_.doubleValue)(breakOut)

@@ -66,9 +66,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       val sessInternal = Cluster.builder().addContactPoint(nodeAddress).build().connect()
 
       val ClusterConfig = sessInternal.getCluster.getConfiguration
-      //ClusterConfig.getSocketOptions.setConnectTimeoutMillis(60000)
-      ClusterConfig.getSocketOptions.setReadTimeoutMillis(60000)
-      ClusterConfig.getPoolingOptions.setIdleTimeoutSeconds(300) // 5 minutes.
+      ClusterConfig.getSocketOptions.setConnectTimeoutMillis(180000)
+      ClusterConfig.getSocketOptions.setReadTimeoutMillis(120000)
+      ClusterConfig.getSocketOptions.setKeepAlive(true)
+      ClusterConfig.getPoolingOptions.setIdleTimeoutSeconds(600) // 5 minutes.
       val protocolVersion = sessInternal.getCluster.getConfiguration.getProtocolOptions.getProtocolVersion
 
       val poolingOptions = sessInternal.getCluster.getConfiguration.getPoolingOptions
@@ -604,7 +605,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     */
   def getAllBarsHistMeta: Seq[barsMeta] = {
     session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-      //.filter(r => Seq(8).contains(r.tickerId) && Seq(30/*300,600,1800,3600*/).contains(r.barWidthSec)) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+      //.filter(r => Seq(20).contains(r.tickerId) /*&& Seq(30/*300,600,1800,3600*/).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -672,7 +673,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     */
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB]) :Unit = {
 
-    val partsSeqBarFa = seqFA.grouped(100)//other limit 65535 for tiny rows.
+    val partsSeqBarFa = seqFA.grouped(50)//other limit 65535 for tiny rows.
 
     for(thisPartOfSeq <- partsSeqBarFa) {
       //logger.debug("INSIDE [saveBarsFutAnal] SIZE OF thisPartOfSeq = "+thisPartOfSeq.size)
@@ -700,7 +701,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      //.filter(r =>  r.tickerId==7 /*&& r.barWidthSec==60*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      .filter(r =>  r.tickerId==1 /*&& Seq(300,600,1800).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -712,7 +713,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int, resType :String) :Option[(LocalDate,Long)] ={
    val seqDdates :Seq[Option[(LocalDate,Long)]] = prcntsDiv.map(
      pr => {
-       logger.debug("INSIDE LOOP: tickerId="+tickerId+" barWidthSec="+barWidthSec+" formDeepKoef="+formDeepKoef+" log_oe = "+pr+" resType = ["+resType+"]")
+       logger.info("INSIDE LOOP: tickerId="+tickerId+" barWidthSec="+barWidthSec+" formDeepKoef="+formDeepKoef+" log_oe = "+pr+" resType = ["+resType+"]")
        session.execute(bndBarsFormsMaxDdate
          .setInt("p_ticker_id", tickerId)
          .setInt("p_bar_width_sec", barWidthSec)
@@ -724,10 +725,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
      }
    )
 
-    logger.debug("(1) seqDdates = "+seqDdates.toString())
+    logger.info("(1) seqDdates = "+seqDdates.toString())
 
     val seqNNDdates :Seq[(LocalDate,Long)] = seqDdates.collect{ case Some(d) => d }
-    logger.debug("(2) seqNNDdates = "+seqNNDdates.toString())
+    logger.info("(2) seqNNDdates = "+seqNNDdates.toString())
 
     if (seqNNDdates.isEmpty)
      None
@@ -832,6 +833,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     */
   def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick] ={
    // ticker_id,ddate
+    logger.info("1. INTERNAL READ TICKS (" + (tickerID) + ") (ddateMin,ddateMax) = ( "+ddateMin+" , "+ddateMax+" )   (tsMin,tsMax) = ( "+tsMin+" , "+tsMax+" )")
     session.execute(bndDdatesTicksByInter
         .setInt( "p_ticker_id",tickerID)
         .setDate("p_ddate_max",ddateMax)
@@ -851,7 +853,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                 r.getDouble("ask"),
                 r.getDouble("bid"))
               )
-          logger.debug("INTERNAL READ TICKS (" + (tickerID,ddate) + ") ROWS = "+seqTickOneDDate.size+" SIZE = "+ SizeEstimator.estimate(seqTickOneDDate)/1024L/1024L+" Mb.")
+          logger.info("  2. INTERNAL READ TICKS (" + (tickerID,ddate) + ") ROWS = "+seqTickOneDDate.size+" SIZE = "+ SizeEstimator.estimate(seqTickOneDDate)/1024L/1024L+" Mb.")
         seqTickOneDDate.sortBy(e => e.db_tsunx)
     }.flatten.filter(elm => elm.db_tsunx >= tsMin && elm.db_tsunx <= tsMax)
   }
