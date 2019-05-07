@@ -11,10 +11,12 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
   val seqWays: Seq[String] = Seq("mx", "mn")
 
   def allFABarsDebugLog(tickerId: Int, barWidthSec: Int, allFABars: Seq[barsResToSaveDB]): Unit = {
-    logger.info("allFABars for " + (tickerId, barWidthSec) + " SIZE " + allFABars.size +
-      "  (" + allFABars.head.ts_end + ") " +
-      " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" +
-      SizeEstimator.estimate(allFABars) / 1024L / 1024L + " Mb.")
+    if (allFABars.nonEmpty)
+      logger.info("allFABars for " + (tickerId, barWidthSec) + " SIZE " + allFABars.size +
+        "  (" + allFABars.head.ts_end + ") " +
+        " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" +
+        SizeEstimator.estimate(allFABars) / 1024L / 1024L + " Mb.")
+     else logger.info("allFABars for " + (tickerId, barWidthSec) + " SIZE = 0 EMPTY !")
   }
 
   def debugLastBarsOfGrp(lastBarsOfForms: Seq[(Int, barsResToSaveDB)]): Unit = {
@@ -82,6 +84,7 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
                       dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef, wayType)
                     gedbugMinDdates(minDdateTsFromBForms, tickerId, barWidthSec, barsFam)
 
+                    //todo #1 Double reading same data for different wayType !!! Optimize it.
                     val allFABars = dbInst.getAllFaBars(
                       barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec), minDdateTsFromBForms)
                     allFABarsDebugLog(tickerId, barWidthSec, allFABars)
