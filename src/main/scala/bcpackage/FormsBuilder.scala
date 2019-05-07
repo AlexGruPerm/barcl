@@ -77,13 +77,15 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
             .flatMap {
               case (tickerId, barWidthSec) => firstLog(tickerId, barWidthSec)
                 seqWays.flatMap {
-                  /*case wayType: String*/ wayType =>
+                    wayType =>
                     val minDdateTsFromBForms :Option[(LocalDate, Long)] =
                       dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef, wayType)
                     gedbugMinDdates(minDdateTsFromBForms, tickerId, barWidthSec, barsFam)
+
                     val allFABars: Seq[barsResToSaveDB] = dbInst.getAllFaBars(
                       barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec), minDdateTsFromBForms)
                     allFABarsDebugLog(tickerId, barWidthSec, allFABars)
+
                     prcntsDiv
                       .withFilter(thisPercent => allFABars.exists(b => b.log_oe == thisPercent && b.res_type == wayType))
                       .flatMap(
@@ -91,6 +93,7 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
                           dbInst.filterFABars(allFABars.filter(b => b.log_oe == thisPercent && b.res_type == wayType),
                             intervalNewGroupKoeff)
                       )
+
                 }
             }
 
