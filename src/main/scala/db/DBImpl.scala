@@ -38,7 +38,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsResToSaveDB]
   def filterFABars(seqB :Seq[barsResToSaveDB], intervalNewGroupKoeff :Int) :Seq[(Int,barsResToSaveDB)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
-  def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick]
+  def getAllTicksForForms(tickerID :Int, firstBarOfLastBars :barsResToSaveDB, lastBarOfLastBars :barsResToSaveDB) :Seq[tinyTick]
   def saveForms(seqForms : Seq[bForm])
   //def getFaBarsFiltered(seqBars :Seq[barsFaData],resType :String,futureInterval :Double,groupIntervalSec :Int) :Seq[barsFaData]
 
@@ -701,7 +701,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      .filter(r =>  r.tickerId==1 /*&& Seq(300,600,1800).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      //.filter(r =>  r.tickerId==1 /*&& Seq(300,600,1800).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
@@ -710,6 +710,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * Read max ddate from mts_bars.bars_forms for each key ticker_id, bar_width_sec, formdeepkoef, prcnt
     * and return minimal one.
   */
+  //TODO : Rewrite this method in short way.
   def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int, resType :String) :Option[(LocalDate,Long)] ={
    val seqDdates :Seq[Option[(LocalDate,Long)]] = prcntsDiv.map(
      pr => {
@@ -831,9 +832,17 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * Read all ticks for this tickerID and ts interval, additional less than ddateMax
     */
-  def getAllTicksForForms(tickerID :Int, tsMin :Long, tsMax :Long, ddateMin : LocalDate, ddateMax : LocalDate) :Seq[tinyTick] ={
-   // ticker_id,ddate
-    logger.info("1. INTERNAL READ TICKS (" + (tickerID) + ") (ddateMin,ddateMax) = ( "+ddateMin+" , "+ddateMax+" )   (tsMin,tsMax) = ( "+tsMin+" , "+tsMax+" )")
+  def getAllTicksForForms(tickerID :Int, firstBarOfLastBars :barsResToSaveDB, lastBarOfLastBars :barsResToSaveDB) :Seq[tinyTick] ={
+    //val tsMin    :Long = firstBarOfLastBars.ts_end
+    //val tsMax    :Long = lastBarOfLastBars.ts_end
+    //val ddateMin :LocalDate = firstBarOfLastBars.dDate
+    //val ddateMax :LocalDate = lastBarOfLastBars.dDate
+
+    val (tsMin :Long, ddateMin :LocalDate) = (firstBarOfLastBars.ts_end, firstBarOfLastBars.dDate)
+    val (tsMax :Long, ddateMax :LocalDate) = (lastBarOfLastBars.ts_end, lastBarOfLastBars.dDate)
+
+    logger.debug("1. INTERNAL READ TICKS (" + (tickerID) + ") (ddateMin,ddateMax) = ( "+ddateMin+" , "+ddateMax+" )   (tsMin,tsMax) = ( "+tsMin+" , "+tsMax+" )")
+
     session.execute(bndDdatesTicksByInter
         .setInt( "p_ticker_id",tickerID)
         .setDate("p_ddate_max",ddateMax)
@@ -853,7 +862,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                 r.getDouble("ask"),
                 r.getDouble("bid"))
               )
-          logger.info("  2. INTERNAL READ TICKS (" + (tickerID,ddate) + ") ROWS = "+seqTickOneDDate.size+" SIZE = "+ SizeEstimator.estimate(seqTickOneDDate)/1024L/1024L+" Mb.")
+          logger.debug("  2. INTERNAL READ TICKS (" + (tickerID,ddate) + ") ROWS = "+seqTickOneDDate.size+" SIZE = "+ SizeEstimator.estimate(seqTickOneDDate)/1024L/1024L+" Mb.")
         seqTickOneDDate.sortBy(e => e.db_tsunx)
     }.flatten.filter(elm => elm.db_tsunx >= tsMin && elm.db_tsunx <= tsMax)
   }
