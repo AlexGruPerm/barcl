@@ -701,41 +701,40 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-      //.filter(r =>  r.tickerId==1 /*&& Seq(300,600,1800).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      .filter(r =>  r.tickerId == 18 /*&& Seq(300,600,1800).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
     //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
+
+
+  def getDdateTsEndFromRow(row :Row) : Option[(LocalDate,Long)] = {
+    Option(row.getDate("ddate")) match {
+      case Some(ld) => Some((ld,row.getLong("ts_end")))
+      case None => None
+    }
+  }
+
 
   /**
     * Read max ddate from mts_bars.bars_forms for each key ticker_id, bar_width_sec, formdeepkoef, prcnt
     * and return minimal one.
   */
-  //TODO : Rewrite this method in short way.
   def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int, resType :String) :Option[(LocalDate,Long)] ={
-   val seqDdates :Seq[Option[(LocalDate,Long)]] = prcntsDiv.map(
-     pr => {
-       logger.info("INSIDE LOOP: tickerId="+tickerId+" barWidthSec="+barWidthSec+" formDeepKoef="+formDeepKoef+" log_oe = "+pr+" resType = ["+resType+"]")
-       session.execute(bndBarsFormsMaxDdate
-         .setInt("p_ticker_id", tickerId)
-         .setInt("p_bar_width_sec", barWidthSec)
-         .setInt("p_formdeepkoef", formDeepKoef)
-         .setDouble("p_log_oe", pr)
-         .setString("p_res_type",resType))
-         //.one()
-         .all().iterator.asScala.toSeq.map(row => (row.getDate("ddate"), row.getLong("ts_end"))).headOption
-     }
-   )
-
-    logger.info("(1) seqDdates = "+seqDdates.toString())
-
-    val seqNNDdates :Seq[(LocalDate,Long)] = seqDdates.collect{ case Some(d) => d }
-    logger.info("(2) seqNNDdates = "+seqNNDdates.toString())
-
-    if (seqNNDdates.isEmpty)
-     None
-    else
-      Option(seqNNDdates.filter(elm => elm._2 == seqNNDdates.map(s => s._2).min ).head)
+    prcntsDiv.map(
+      pr => getDdateTsEndFromRow(session.execute(bndBarsFormsMaxDdate
+        .setInt("p_ticker_id", tickerId)
+        .setInt("p_bar_width_sec", barWidthSec)
+        .setInt("p_formdeepkoef", formDeepKoef)
+        .setDouble("p_log_oe", pr)
+        .setString("p_res_type", "mx")
+      ).one())
+    ).collect {case Some(d) => d}.toList
+    match {
+      case List() => None
+      case nel: List[(LocalDate, Long)] => Option(nel.minBy(_._2))
+    }
   }
+
 
 
   /**
