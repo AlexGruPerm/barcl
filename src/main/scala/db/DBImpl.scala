@@ -861,35 +861,30 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   /**
     * Save all calculated forms of bars into DB.
+    * Save separated by partition key, because batch inserts.
   */
   def saveForms(seqForms : Seq[bForm]) = {
-    /*
-    for (f <- seqForms.take(10)) {
-      logger.debug("  FORM :  "+f.tickerId + " ts("+f.TsBegin+","+f.TsEnd+") ticksCnt="+f.FormProps.get("ticksCnt"))
-    }
-    */
-    //logger.debug("INSIDE[1] [saveBarsFutAnal] SIZE OF seqForms = "+seqForms.size)
-    val parts = seqForms.grouped(100)//other limit 65535 for tiny rows.
-
-    for(thisPartOfSeq <- parts) {
-      //logger.debug("INSIDE[2] [saveBarsFutAnal] SIZE OF thisPartOfSeq = "+thisPartOfSeq.size)
-      var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
-      thisPartOfSeq.foreach {
-        t =>
-          batch.add(bndSaveForms.bind()
-            .setInt("p_ticker_id", t.tickerId)
-            .setInt("p_bar_width_sec",t.barWidthSec)
-            .setDate("p_ddate", t.dDate)
-            .setLong("p_ts_begin", t.TsBegin)
-            .setLong("p_ts_end", t.TsEnd)
-            .setDouble("p_log_oe",t.log_oe)
-            .setString("p_res_type",t.resType)
-            .setInt("p_formDeepKoef", t.formDeepKoef)
-            .setMap("p_FormProps", t.FormProps.asJava)
-          )
-      }
-      session.execute(batch)
-
+    seqForms.map(f => f.dDate).distinct.toList.collect {
+      case  thisDdate =>
+        val parts = seqForms.filter(tf => tf.dDate == thisDdate).grouped(100)//other limit 65535 for tiny rows.
+        for(thisPartOfSeq <- parts) {
+          var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
+          thisPartOfSeq.foreach {
+            t =>
+              batch.add(bndSaveForms.bind()
+                .setInt("p_ticker_id", t.tickerId)
+                .setInt("p_bar_width_sec",t.barWidthSec)
+                .setDate("p_ddate", t.dDate)
+                .setLong("p_ts_begin", t.TsBegin)
+                .setLong("p_ts_end", t.TsEnd)
+                .setDouble("p_log_oe",t.log_oe)
+                .setString("p_res_type",t.resType)
+                .setInt("p_formDeepKoef", t.formDeepKoef)
+                .setMap("p_FormProps", t.FormProps.asJava)
+              )
+          }
+          session.execute(batch)
+        }
     }
   }
   /** --------------------------------------------------------------------------------------- */

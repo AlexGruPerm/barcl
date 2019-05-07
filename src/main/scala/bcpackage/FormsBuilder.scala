@@ -37,6 +37,11 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
     logger.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ")
   }
 
+  def logFirstLastBars(thisTickerID :Int, firstBarOfLastBars :barsResToSaveDB,lastBarOfLastBars :barsResToSaveDB) ={
+    logger.info(" thisTickerID=" + thisTickerID + " getAllTicksForForms for FB TS_END=" + firstBarOfLastBars.ts_end + " FB_DDATE=" + firstBarOfLastBars.dDate +
+      " LB TS_END=" + lastBarOfLastBars.ts_end + " LB_DDATE=" + lastBarOfLastBars.dDate)
+  }
+
   /**
     * Read bars from mts_bars.bars_fa with iterations by (tickerId,barWidthSec)
     *  internally by each ddate.
@@ -74,17 +79,16 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
     lastBarsOfFormsAllTickers.map(b => b._2.tickerId).distinct.map {
       case thisTickerID =>
 
+        /*
         val firstBarOfLastBars = lastBarsOfFormsAllTickers.map(b => b._2).filter(elm => elm.tickerId == thisTickerID).minBy(elm => elm.ts_end)
         val lastBarOfLastBars = lastBarsOfFormsAllTickers.map(b => b._2).filter(elm => elm.tickerId == thisTickerID).maxBy(elm => elm.ts_end)
+        */
+        val (firstBarOfLastBars :barsResToSaveDB,lastBarOfLastBars :barsResToSaveDB) = lastBarsOfFormsAllTickers map(_._2) filter(_.tickerId == thisTickerID) match {
+          case lastBars :List[barsResToSaveDB] => (lastBars.minBy(_.ts_end), lastBars.maxBy(_.ts_end))
+        }
 
-        logger.info(" thisTickerID=" + thisTickerID + " getAllTicksForForms for FB TS_END=" + firstBarOfLastBars.ts_end + " FB_DDATE=" + firstBarOfLastBars.dDate +
-          " LB TS_END=" + lastBarOfLastBars.ts_end + " LB_DDATE=" + lastBarOfLastBars.dDate)
+        logFirstLastBars(thisTickerID, firstBarOfLastBars, lastBarOfLastBars)
 
-        /**
-          * For optimization, read only once.
-          * First : 553 rows. 96.525 secs
-          * Second: 553 rows.
-          */
         val seqFormAllTinyTicks: Seq[tinyTick] = dbInst.getAllTicksForForms(
           thisTickerID,
           firstBarOfLastBars.ts_end,
@@ -94,18 +98,23 @@ class FormsBuilder(nodeAddress :String, prcntsDiv : Seq[Double], formDeepKoef :I
 
         logger.info(" seqFormAllTinyTicks.ROWS=[" + seqFormAllTinyTicks.size + "] SIZE =[" + SizeEstimator.estimate(seqFormAllTinyTicks) / 1024L / 1024L + "] Mb.")
 
-        lastBarsOfFormsAllTickers.map(b => b._2).filter(elm => elm.tickerId == thisTickerID).map(fb => (fb.tickerId, fb.barWidthSec)).distinct.toList
+        lastBarsOfFormsAllTickers.map(b => b._2)
+          .filter(elm => elm.tickerId == thisTickerID)
+          .map(fb =>  fb.barWidthSec)
+          .distinct.toList
           .collect {
-            case (tickerId, barWidthSec) =>
-              logger.info(" tickerId = " + tickerId + " barWidthSec = " + barWidthSec + " >  getAllTicksForForms ")
-
+            case  barWidthSec =>
               val seqForms: Seq[bForm] =
-                lastBarsOfFormsAllTickers.filter(groupBars => groupBars._2.tickerId == thisTickerID).collect {
+                lastBarsOfFormsAllTickers.filter(groupBars => groupBars._2.tickerId == thisTickerID &&
+                                                              groupBars._2.barWidthSec == barWidthSec).collect {
                   case (grpNum: Int, lb: barsResToSaveDB) =>
                     val seqFormTicks: Seq[tinyTick] = seqFormAllTinyTicks.filter(t => t.db_tsunx >= (lb.ts_end - formDeepKoef * lb.barWidthSec * 1000L) && t.db_tsunx <= lb.ts_end)
                     bForm.create(lb, formDeepKoef, seqFormTicks)
                 }
-              logger.info(" =[2]======= seqForms.ROWS=[" + seqForms.size + "] SIZE =[" + SizeEstimator.estimate(seqForms) / 1024L + "] Kb. ========")
+
+              // TODO: Convert to Function
+              logger.info(" tickerId = " + thisTickerID + " barWidthSec = " + barWidthSec + " >  getAllTicksForForms "+
+                " seqForms.ROWS=[" + seqForms.size + "] SIZE =[" + SizeEstimator.estimate(seqForms) / 1024L + "] Kb.")
               dbInst.saveForms(seqForms.toList.filter(elm => elm.TsBegin != 0L && (elm.TsEnd - elm.TsBegin) / 1000L >= (elm.formDeepKoef - 1) * elm.barWidthSec))
           }
 
