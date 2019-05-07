@@ -726,7 +726,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         .setInt("p_bar_width_sec", barWidthSec)
         .setInt("p_formdeepkoef", formDeepKoef)
         .setDouble("p_log_oe", pr)
-        .setString("p_res_type", "mx")
+        .setString("p_res_type", resType)
       ).one())
     ).collect {case Some(d) => d}.toList
     match {

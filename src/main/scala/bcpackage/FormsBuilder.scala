@@ -10,13 +10,13 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
   val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   val seqWays: Seq[String] = Seq("mx", "mn")
 
-  def allFABarsDebugLog(tickerId: Int, barWidthSec: Int, allFABars: Seq[barsResToSaveDB]): Unit = {
+  def allFABarsDebugLog(tickerId: Int, barWidthSec: Int, allFABars: Seq[barsResToSaveDB], wayType :String): Unit = {
     if (allFABars.nonEmpty)
-      logger.info("allFABars for " + (tickerId, barWidthSec) + " SIZE " + allFABars.size +
+      logger.info("wayType ="+wayType+" allFABars for " + (tickerId, barWidthSec) + " SIZE " + allFABars.size +
         "  (" + allFABars.head.ts_end + ") " +
         " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" +
         SizeEstimator.estimate(allFABars) / 1024L / 1024L + " Mb.")
-     else logger.info("allFABars for " + (tickerId, barWidthSec) + " SIZE = 0 EMPTY !")
+     else logger.info("wayType ="+wayType+" allFABars for " + (tickerId, barWidthSec) + " SIZE = 0 EMPTY !")
   }
 
   def debugLastBarsOfGrp(lastBarsOfForms: Seq[(Int, barsResToSaveDB)]): Unit = {
@@ -78,6 +78,12 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
             .distinct.toList
             .flatMap {
               case (tickerId, barWidthSec) => firstLog(tickerId, barWidthSec)
+
+               //todo #0: here we make  seqWays.flatMap {wayType =>
+                //                       next search MIN-MAX
+                //                        make ONE read of allFABars = dbInst.getAllFaBars(
+                //                         and exeute old code, without reading   dbInst.getAllFaBars AT ALL
+
                 seqWays.flatMap {
                   wayType =>
                     val minDdateTsFromBForms: Option[(LocalDate, Long)] =
@@ -87,7 +93,8 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
                     //todo #1 Double reading same data for different wayType !!! Optimize it.
                     val allFABars = dbInst.getAllFaBars(
                       barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec), minDdateTsFromBForms)
-                    allFABarsDebugLog(tickerId, barWidthSec, allFABars)
+
+                    allFABarsDebugLog(tickerId, barWidthSec, allFABars, wayType)
 
                     prcntsDiv
                       .withFilter(thisPercent => allFABars.exists(b => b.log_oe == thisPercent && b.res_type == wayType))
@@ -96,8 +103,12 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
                           dbInst.filterFABars(allFABars.filter(b => b.log_oe == thisPercent && b.res_type == wayType),
                             intervalNewGroupKoeff)
                       )
-
                 }
+
+
+
+
+
             }
 
         logger.debug("lastBarsOfFormsAllTickers ROWS=" + lastBarsOfFormsAllTickers.size + " SIZE OF WHOLE  = " +
