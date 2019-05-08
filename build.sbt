@@ -38,6 +38,8 @@ assemblyMergeStrategy in assembly := {
   case "META-INF/mimetypes.default" => MergeStrategy.last
   case "plugin.properties" => MergeStrategy.last
   case "log4j.properties" => MergeStrategy.last
+  case "logback.xml" => MergeStrategy.last
+  case "resources/logback.xml" => MergeStrategy.last
   case x => MergeStrategy.first
 }
 

@@ -51,7 +51,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
 
       def readTicksRecurs(readFromTs :Long, readToTs :Long) :(seqTicksObj,Long) ={
         val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
-        if (seqTicks.sqTicks.size==0)
+        if (seqTicks.sqTicks.size==0) //todo : replace on isEmpty
         (seqTicks,readMsec)
         else if (
           cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) <  readToTs
@@ -64,6 +64,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
         else
           (seqTicks,readMsec)
       }
+
 
       val (seqTicks,readMsec) = readTicksRecurs(currReadInterval._1, currReadInterval._2) 
 

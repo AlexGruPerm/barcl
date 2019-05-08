@@ -20,6 +20,15 @@ case class  Tick(
 
 object TicksLoader extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
+
+  logger.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  logger.info("                 ")
+  logger.info("BEGIN TicksLoader")
+  logger.info("                 ")
+  logger.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  Thread.sleep(2000)
+
+
   val nodeFrom: String = "193.124.112.90" // remote Ultra VDS
   val nodeTo: String = "192.168.122.192"  // local 3 instance Cluster. For cluster:
 
@@ -92,11 +101,18 @@ object TicksLoader extends App {
       * After reducing this batch size, I didn't face the exception.
       * So, maybe you are trying to load to much data into Cassandra in a single request.
     */
-    val partSqTicks = sqTicks.grouped(10000/*65535*/)
+    val partSqTicks = sqTicks.grouped(5000/*65535*/)
 
-    logger.info(">>> begin for(thisPartOfSeq <- partSqTicks)")
+    logger.info(">>> begin BATCH for(thisPartOfSeq <- partSqTicks)")
+
+
     for(thisPartOfSeq <- partSqTicks) {
-      var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
+      var batch = new BatchStatement(BatchStatement.Type.LOGGED)//UNLOGGED
+      batch.setIdempotent(true)
+      //RetryPolicy.RetryDecision.retry(ConsistencyLevel.ANY).
+      //val policy :RetryPolicy = RetryP
+      //batch.setRetryPolicy().
+
       thisPartOfSeq.foreach {
         t =>
           batch.add(bndSaveTickWb.bind
@@ -107,9 +123,11 @@ object TicksLoader extends App {
             .setDouble("p_ask", t.ask)
             .setDouble("p_bid", t.bid))
       }
+      logger.info("inside before execute batch.size()="+batch.size())
       sessTo.execute(batch)
+      batch.clear()
     }
-    logger.info("<<< end")
+    logger.info("<<< end BATCH insert")
 
     logger.info("next begin bndSaveTicksByDay")
     sessTo.execute(bndSaveTicksByDay
