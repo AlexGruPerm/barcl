@@ -82,7 +82,7 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
                //todo #0: here we make  seqWays.flatMap {wayType =>
                 //                       next search MIN-MAX
                 //                        make ONE read of allFABars = dbInst.getAllFaBars(
-                //                         and exeute old code, without reading   dbInst.getAllFaBars AT ALL
+                //                         and execute old code, without reading   dbInst.getAllFaBars AT ALL
 
                 seqWays.flatMap {
                   wayType =>
@@ -90,9 +90,14 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
                       dbInst.getMinDdateBFroms(tickerId, barWidthSec, prcntsDiv, formDeepKoef, wayType)
                     gedbugMinDdates(minDdateTsFromBForms, tickerId, barWidthSec, barsFam)
 
-                    //todo #1 Double reading same data for different wayType !!! Optimize it.
-                    val allFABars = dbInst.getAllFaBars(
-                      barsFam.filter(r => r.tickerId == tickerId && r.barWidthSec == barWidthSec), minDdateTsFromBForms)
+                    val (minDdate,minTs) =  minDdateTsFromBForms match {
+                      case Some(minDdateTs) => (Option(minDdateTs._1),Option(minDdateTs._2))
+                      case None => (Option(null),Option(0L))
+                    }
+
+                    //todo #1 Double reading "LIKE SAME" data for different wayType !!! Optimize it.
+                    val allFABars = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId &&
+                                                                       r.barWidthSec == barWidthSec), minDdate,minTs)
 
                     allFABarsDebugLog(tickerId, barWidthSec, allFABars, wayType)
 

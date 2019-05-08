@@ -35,7 +35,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   // For FormsBuilder
   def getAllBarsFAMeta : Seq[barsFaMeta]
   def getMinDdateBFroms(tickerId :Int, barWidthSec :Int, prcntsDiv : Seq[Double], formDeepKoef :Int, resType :String) :Option[(LocalDate,Long)]
-  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsResToSaveDB]
+  def getAllFaBars(seqB :Seq[barsFaMeta], minDdate :Option[LocalDate], minTs :Option[Long]) :Seq[barsResToSaveDB]
   def filterFABars(seqB :Seq[barsResToSaveDB], intervalNewGroupKoeff :Int) :Seq[(Int,barsResToSaveDB)]
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick]
   def getAllTicksForForms(tickerID :Int, firstBarOfLastBars :barsResToSaveDB, lastBarOfLastBars :barsResToSaveDB) :Seq[tinyTick]
@@ -701,9 +701,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-       .filter(r =>  r.tickerId == 1 && Seq(30).contains(r.barWidthSec)) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       .filter(r =>  r.tickerId == 18 /*&& Seq(30).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
-    //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
 
 
@@ -739,40 +738,35 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   /**
     *
-    * Read all data for each ddata by key: ticker_id and bws
-    * OR
-    * read just part begining from (LocalDate,Long) if something already calced in bars_forms.
-    *
+    * Read all data for each ddata by key: ticker_id and barWidthSec OR
+    * read just part begin from (LocalDate,Long) if something already calculated in bars_forms.
+    * We don't need to sort by sr.tickerId, sr.barWidthSec because this function calls for single tickerId + barWidthSec
+    * look at :
+    * val allFABars = dbInst.getAllFaBars(barsFam.filter(r => r.tickerId == tickerId &&
+    *                                                    r.barWidthSec == barWidthSec) .... )
   */
-  def getAllFaBars(seqB :Seq[barsFaMeta],minDdateTsFromBForms :Option[(LocalDate,Long)]) :Seq[barsResToSaveDB] = {
-
-    val minDdateTs : (Option[LocalDate],Long) =  minDdateTsFromBForms match {
-      case Some(minDdateTs) => (Option(minDdateTs._1),minDdateTs._2)
-      case None => (Option(null),0L)
-    }
-
-    minDdateTs match {
-      case (Some(minDdate),tsEndBegin : Long) =>
-        seqB.filter(b => b.dDate.getMillisSinceEpoch >= minDdate.getMillisSinceEpoch)
+  def getAllFaBars(seqB :Seq[barsFaMeta], minDdate :Option[LocalDate], minTs :Option[Long]) :Seq[barsResToSaveDB] = {
+    (minDdate,minTs) match {
+      case (Some(minDdate),Some(tsEndBegin)) =>
+        seqB.withFilter(b => b.dDate.getMillisSinceEpoch >= minDdate.getMillisSinceEpoch)
           .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd
             .setInt("p_ticker_id", sb.tickerId)
             .setInt("p_bar_width_sec", sb.barWidthSec)
             .setDate("p_ddate", sb.dDate)
-            .setLong("p_ts_end", minDdateTs._2))
-            .all()
-            .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
-            .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.ts_end)))
+            .setLong("p_ts_end", tsEndBegin))
+            .all().iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+            .sortBy(_.ts_end))
       case _ =>
         seqB.flatMap(sb => session.execute(bndBarsFaData
           .setInt("p_ticker_id", sb.tickerId)
           .setInt("p_bar_width_sec", sb.barWidthSec)
           .setDate("p_ddate", sb.dDate))
-          .all()
-          .iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
-          .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate, sr.ts_end)))
+          .all().iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
+          .sortBy(_.ts_end))
     }
-
   }
+
+
 
   /**
     * Filter source seq of FABars and group it groups with group number,
