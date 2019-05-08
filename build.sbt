@@ -3,8 +3,24 @@ version := "0.1"
 scalaVersion := "2.11.8"
 version := "1.0"
 
+/**
+  * todo: try use cassandra 4.0.0 driver with replace
+  *
+  * Driver 3:
+  * import com.datastax.driver.core.ResultSet
+  * import com.datastax.driver.core.Row
+  * import com.datastax.driver.core.SimpleStatement
+  *
+  * Driver 4:
+  * import com.datastax.oss.driver.api.core.cql.ResultSet;
+  * import com.datastax.oss.driver.api.core.cql.Row;
+  * import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+  *
+  *
+*/
+
 libraryDependencies ++= Seq(
-  "com.datastax.cassandra" % "cassandra-driver-core" % "3.6.0",
+  "com.datastax.cassandra" % "cassandra-driver-core" % "3.7.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scala-lang" % "scala-library" % "2.11.8",
   "com.madhukaraphatak" %% "java-sizeof" % "0.1",
@@ -25,7 +41,31 @@ assemblyMergeStrategy in assembly := {
   case x => MergeStrategy.first
 }
 
-assemblyJarName in assembly :="barcl.jar" // "ticksloader.jar"
+/**
+  * For ticksloader
+  *
+  * assemblyJarName in assembly :="ticksloader.jar"
+  * mainClass in (Compile, packageBin) := Some("bcapp.TicksLoader")
+  * mainClass in (Compile, run) := Some("bcapp.TicksLoader")
+  *
+*/
 
-mainClass in (Compile, packageBin) := Some("bcapp.BarsCalcApp")  //bcapp.TicksLoader
+/**
+  * For bar calcluator
+  *
+  * assemblyJarName in assembly :="barcl.jar"
+  * mainClass in (Compile, packageBin) := Some("bcapp.BarsCalcApp")
+  * mainClass in (Compile, run) := Some("bcapp.BarsCalcApp")
+  *
+  */
+
+assemblyJarName in assembly :="ticksloader.jar"
+mainClass in (Compile, packageBin) := Some("bcapp.TicksLoader")
+mainClass in (Compile, run) := Some("bcapp.TicksLoader")
+
+
+/*
+assemblyJarName in assembly :="barcl.jar"
+mainClass in (Compile, packageBin) := Some("bcapp.BarsCalcApp")
 mainClass in (Compile, run) := Some("bcapp.BarsCalcApp")
+*/

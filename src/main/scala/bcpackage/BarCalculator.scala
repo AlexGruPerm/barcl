@@ -22,21 +22,21 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   def logCalcProp(cp :CalcProperty) ={
-    logger.debug("Calc property: -------------------------------------------------------------------------------------")
-    logger.debug(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" +
+    logger.info("Calc property: -------------------------------------------------------------------------------------")
+    logger.info(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" +
       /*"  LASTBAR_DDATE=[" + cp.dDateBeginLastBar +*/ "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
       cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick+ " cp FIRSTTICK="+cp.tsFirstTicks)
 
-    logger.debug(" First tick TS = "+cp.tsFirstTicks)
-    logger.debug(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
+    logger.info(" First tick TS = "+cp.tsFirstTicks)
+    logger.info(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
       Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
   }
 
   def calcIteration(dbInst :DBImpl) ={
     val allCalcProps :CalcProperties = dbInst.getAllCalcProperties
-    logger.debug(" Size of all bar calculator properties is "+allCalcProps.cProps.size)
+    logger.info(" Size of all bar calculator properties is "+allCalcProps.cProps.size)
 
-    for(cp <- allCalcProps.cProps.filter(c => c.barDeepSec==30)) {
+    for(cp <- allCalcProps.cProps/*.filter(c => c.barDeepSec==30)*/) {
       logCalcProp(cp)
 
       val currReadInterval :(Long,Long) = (cp.beginFrom,
@@ -46,8 +46,8 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
             case _ => cp.beginFrom
           }).min)
 
-      logger.debug(" In this iteration will read interval (PLAN) FROM: "+ currReadInterval._1+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) +")")
-      logger.debug("                                      (PLAN)   TO: "+ currReadInterval._2+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) +")")
+      logger.info(" In this iteration will read interval (PLAN) FROM: "+ currReadInterval._1+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) +")")
+      logger.info("                                      (PLAN)   TO: "+ currReadInterval._2+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) +")")
 
       def readTicksRecurs(readFromTs :Long, readToTs :Long) :(seqTicksObj,Long) ={
         val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
@@ -65,19 +65,19 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
           (seqTicks,readMsec)
       }
 
-      val (seqTicks,readMsec) = readTicksRecurs(currReadInterval._1, currReadInterval._2) // dbInst.getTicksByInterval(cp, currReadInterval._1, currReadInterval._2)
+      val (seqTicks,readMsec) = readTicksRecurs(currReadInterval._1, currReadInterval._2) 
 
-      logger.debug("Duration of read ticks seq = "+ readMsec + " msecs. Read ["+seqTicks.sqTicks.size+"] ticks.")
+      logger.info("Duration of read ticks seq = "+ readMsec + " msecs. Read ["+seqTicks.sqTicks.size+"] ticks.")
 
       if (seqTicks.sqTicks.size != 0) {
         val bars :Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec*1000L)
-        logger.debug(" bars.size="+bars.size)
+        logger.info(" bars.size="+bars.size)
         if (bars.size > 0)
           dbInst.saveBars(bars)
       }
 
-      logger.debug(" ")
-      logger.debug("----------------------------------------------------------------------------------------------------")
+      logger.info(" ")
+      logger.info("----------------------------------------------------------------------------------------------------")
     }
   }
 
@@ -93,7 +93,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
                                        // "oracle"    => new DbOra(nodeAddress,dbType)
                                       }
     require(!dbInst.isClosed,s"Session to [$dbType] is closed.")
-    logger.debug(s"Session to [$dbType] is opened. Continue.")
+    logger.info(s"Session to [$dbType] is opened. Continue.")
 
     def taskCalcBars(): Future[Unit] = Future {
       val t1 = System.currentTimeMillis

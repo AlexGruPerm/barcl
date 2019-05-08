@@ -20,17 +20,24 @@ case class  Tick(
 
 object TicksLoader extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
-  val nodeFrom: String = "193.124.112.90" // remote Yandex cloud (single instance)
-  val nodeTo: String = "10.241.5.234"  // local 3 instance Cluster. For cluster:
+  val nodeFrom: String = "193.124.112.90" // remote Ultra VDS
+  val nodeTo: String = "192.168.122.192"  // local 3 instance Cluster. For cluster:
 
   val sessFrom = Cluster.builder().addContactPoint(nodeFrom).build().connect()
   val sessTo = Cluster.builder().addContactPoint(nodeTo).build().connect()
 
   sessFrom.getCluster.getConfiguration.getSocketOptions.setReadTimeoutMillis(12000)
-  sessTo.getCluster.getConfiguration.getSocketOptions.setConnectTimeoutMillis(6000)
+  sessFrom.getCluster.getConfiguration.getSocketOptions.setKeepAlive(true)
 
-  sessFrom.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(90);
-  sessTo.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(90);
+  sessTo.getCluster.getConfiguration.getSocketOptions.setConnectTimeoutMillis(6000)
+  sessTo.getCluster.getConfiguration.getSocketOptions.setKeepAlive(true)
+
+  sessFrom.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(120);
+  sessTo.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(120);
+
+
+
+
 
   val bndTicksCountDays = sessFrom.prepare(""" select ticker_id,ddate,ticks_count from mts_src.ticks_count_days """).bind()
 
@@ -53,7 +60,7 @@ object TicksLoader extends App {
 
   val sqTicksCountTotal = sessFrom.execute(bndTicksTotal)
     .all().iterator.asScala.toSeq
-    .map(r => TicksCountTotal(r.getInt("ticker_id"),r.getLong("ticks_count"))).filter(elm => Seq(30,31,32,33,34,35,36,37,38).contains(elm.ticker_id))
+    .map(r => TicksCountTotal(r.getInt("ticker_id"),r.getLong("ticks_count")))/*.filter(elm => Seq(30,31,32,33,34,35,36,37,38).contains(elm.ticker_id))*/
     .sortBy(t => t.ticker_id)
 
   val sqTicksCountDays = sessFrom.execute(bndTicksCountDays)
@@ -61,9 +68,9 @@ object TicksLoader extends App {
     .map(r => TicksCountDays(r.getInt("ticker_id"),r.getDate("ddate"),r.getLong("ticks_count")))
     .sortBy(t => (t.ticker_id,t.ddate.getMillisSinceEpoch)) //sort by ticker_id AND ddate
 
-  for(elm <- sqTicksCountDays.filter(elm => Seq(30,31,32,33,34,35,36,37,38).contains(elm.ticker_id))){
+  for(elm <- sqTicksCountDays/*.filter(elm => Seq(30,31,32,33,34,35,36,37,38).contains(elm.ticker_id))*/){
     val tickCntTotal = sqTicksCountTotal.filter(tct => tct.ticker_id == elm.ticker_id).head.ticks_count
-    println(elm +"  TOTAL_TICKS_COUNT = "+tickCntTotal)
+    logger.info(elm +"  TOTAL_TICKS_COUNT = "+tickCntTotal)
 
     val sqTicks = sessFrom.execute(bndTicksByTickerDdate
       .setInt("tickerId", elm.ticker_id)
@@ -76,10 +83,18 @@ object TicksLoader extends App {
       r.getDouble("ask"),
       r.getDouble("bid"))
     ).sortBy(t => t.db_tsunx)
-    println(" READ sqTicks.size="+sqTicks.size+" head.db_tsunx="+sqTicks.head.db_tsunx)
+    logger.info(" READ sqTicks.size="+sqTicks.size+" head.db_tsunx="+sqTicks.head.db_tsunx)
 
-    val partSqTicks = sqTicks.grouped(65535)
+    /**
+      * https://stackoverflow.com/questions/21819035/write-timeout-thrown-by-cassandra-datastax-driver
+      *
+      * I faced the same problem once. I was using BatchStatement to write data in Cassnadra. My batch size was 10000.
+      * After reducing this batch size, I didn't face the exception.
+      * So, maybe you are trying to load to much data into Cassandra in a single request.
+    */
+    val partSqTicks = sqTicks.grouped(10000/*65535*/)
 
+    logger.info(">>> begin for(thisPartOfSeq <- partSqTicks)")
     for(thisPartOfSeq <- partSqTicks) {
       var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
       thisPartOfSeq.foreach {
@@ -94,13 +109,15 @@ object TicksLoader extends App {
       }
       sessTo.execute(batch)
     }
+    logger.info("<<< end")
 
+    logger.info("next begin bndSaveTicksByDay")
     sessTo.execute(bndSaveTicksByDay
       .setInt("p_ticker_id", elm.ticker_id)
       .setDate("p_ddate", elm.ddate)
       .setLong("p_ticks_count",elm.ticks_count))
 
-    println("   TICKS SAVED INTO Cluster.")
+    logger.info("   TICKS SAVED INTO Cluster.")
   }
 
 
