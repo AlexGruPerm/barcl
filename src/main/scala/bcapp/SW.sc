@@ -1,3 +1,50 @@
+
+
+val seqMinsDdateTs :List[(Option[Long], Option[Long])] =
+  List(
+       (None,Some(1000L)),
+       (Some(5L),Some(1000L)),
+       (None,Some(1551144386007L)),
+       (Some(100500L),None)
+      )
+
+val ord = Ordering.by((_: (Option[Long], Option[Long]))._2
+ match {
+  case Some(l) => l
+  case None => 0L
+ })
+
+seqMinsDdateTs.reduceOption(ord.min).head
+
+/*
+seqMinsDdateTs.collect{
+  case elm :(Option[Long],Option[Long]) =>
+    (elm._1,elm._2) match {
+     case (_,Some(l)) => l
+     case (_,None) => 0L
+  }
+}
+*/
+
+
+/*
+seqMinsDdateTs.minBy(elm => elm {
+  case (elm :(Option[Long], Some[Long])) =>
+    elm._2
+  case None => 0L
+ }
+)
+*/
+
+/*
+Error:(9, 88) not enough arguments for method minBy: (implicit cmp: Ordering[B])(Option[Long], Option[Long]).
+Unspecified value parameter cmp.
+def get$$instance$$res0 = /* ###worksheet### generated $$end$$ */ seqMinsDdateTs.minBy(elm => elm {
+                                                                                      ^
+*/
+
+
+/*
 import com.datastax.driver.core.{Cluster, LocalDate, Row}
 
 val session = Cluster.builder()
@@ -23,8 +70,6 @@ def getDdateTsEndFromRow(row :Row) : Option[(LocalDate,Long)] = {
   }
 }
 
-//val r :Option[(LocalDate,Long)] =
-//val seqDdates :Seq[(LocalDate,Long)] =
   Seq(0.0022,0.0033,0.0044).map(
   pr => {
     getDdateTsEndFromRow(
@@ -42,3 +87,5 @@ def getDdateTsEndFromRow(row :Row) : Option[(LocalDate,Long)] = {
     case List() => None
     case nel : List[(LocalDate,Long)] => Option(nel.minBy(_._2))
   }
+
+*/
