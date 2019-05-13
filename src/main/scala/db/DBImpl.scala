@@ -540,6 +540,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * @return
     */
   def getCalculatedBars(tickerId: Int, seqTicks: Seq[Tick], barDeepSec: Long): Seq[Bar] = {
+    //todo: add check here - seqTicks is noEmpty
 
     val barsSides = seqTicks.head.db_tsunx.to(seqTicks.last.db_tsunx).by(barDeepSec)
 
@@ -547,19 +548,21 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     logger.debug("from : " + seqTicks.head.db_tsunx)
     logger.debug("to   : " + seqTicks.last.db_tsunx)
 
+    //todo: maybe add type like "leftSideTs","rightSideTs" and use it instead of XXX._(1,2)
     val seqBarSides = barsSides.zipWithIndex.map(elm => (elm._1, elm._2))
     logger.debug("seqBarSides.size= " + seqBarSides.size)
 
-    val seqBar2Sides = for (i <- seqBarSides.indices/*0 to seqBarSides.size - 1*/) yield {
+    val seqBar2Sides = for (i <- seqBarSides.indices) yield {
       if (i < seqBarSides.last._2)
         (seqBarSides(i)._1, seqBarSides(i + 1)._1, seqBarSides(i)._2 + 1)
       else
         (seqBarSides(i)._1, seqBarSides(i)._1, seqBarSides(i)._2 + 1)
     }
 
-    def getGroupThisElement(elm: Long) = {
-      seqBar2Sides.find(bs => (bs._1 <= elm && bs._2 > elm) && (bs._2 - bs._1) == barDeepSec).map(x => x._3).getOrElse(0)
-    }
+    //todo: rewrite with removing ._X
+
+    def getGroupThisElement(elm: Long) =
+      seqBar2Sides.find(bs => (bs._1 <= elm && bs._2 > elm) && (bs._2 - bs._1) == barDeepSec).map(_._3).getOrElse(0)
 
     val seqSeqTicks: Seq[(Int, Seq[Tick])] = seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx)).filter(seqT => seqT._1 != 0).toSeq.sortBy(gr => gr._1)
     seqSeqTicks.filter(sb => sb._1 != 0).map(elm =>

@@ -1,5 +1,6 @@
 package bcapp
 
+import com.datastax.driver.core.exceptions.OperationTimedOutException
 import com.datastax.driver.core.{BatchStatement, Cluster, LocalDate}
 import org.slf4j.LoggerFactory
 
@@ -26,7 +27,7 @@ object TicksLoader extends App {
   logger.info("BEGIN TicksLoader")
   logger.info("                 ")
   logger.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-  Thread.sleep(2000)
+  Thread.sleep(1000)
 
 
   val nodeFrom: String = "193.124.112.90" // remote Ultra VDS
@@ -35,14 +36,14 @@ object TicksLoader extends App {
   val sessFrom = Cluster.builder().addContactPoint(nodeFrom).build().connect()
   val sessTo = Cluster.builder().addContactPoint(nodeTo).build().connect()
 
-  sessFrom.getCluster.getConfiguration.getSocketOptions.setReadTimeoutMillis(12000)
+  sessFrom.getCluster.getConfiguration.getSocketOptions.setReadTimeoutMillis(120000)
   sessFrom.getCluster.getConfiguration.getSocketOptions.setKeepAlive(true)
 
-  sessTo.getCluster.getConfiguration.getSocketOptions.setConnectTimeoutMillis(6000)
+  sessTo.getCluster.getConfiguration.getSocketOptions.setConnectTimeoutMillis(60000)
   sessTo.getCluster.getConfiguration.getSocketOptions.setKeepAlive(true)
 
-  sessFrom.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(120);
-  sessTo.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(120);
+  sessFrom.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(180);
+  sessTo.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(180);
 
 
 
@@ -107,7 +108,7 @@ object TicksLoader extends App {
 
 
     for(thisPartOfSeq <- partSqTicks) {
-      var batch = new BatchStatement(BatchStatement.Type.LOGGED)//UNLOGGED
+      var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
       batch.setIdempotent(true)
       //RetryPolicy.RetryDecision.retry(ConsistencyLevel.ANY).
       //val policy :RetryPolicy = RetryP
@@ -130,10 +131,22 @@ object TicksLoader extends App {
     logger.info("<<< end BATCH insert")
 
     logger.info("next begin bndSaveTicksByDay")
-    sessTo.execute(bndSaveTicksByDay
-      .setInt("p_ticker_id", elm.ticker_id)
-      .setDate("p_ddate", elm.ddate)
-      .setLong("p_ticks_count",elm.ticks_count))
+
+
+    try {
+      sessTo.execute(bndSaveTicksByDay
+        .setInt("p_ticker_id", elm.ticker_id)
+        .setDate("p_ddate", elm.ddate)
+        .setLong("p_ticks_count",elm.ticks_count))
+    } catch {
+      case ex: OperationTimedOutException =>
+      {
+        logger.info("EXCEPTION bndSaveTicksByDay = "+ex.getLocalizedMessage)
+        ex.printStackTrace()
+      }
+    }
+
+
 
     logger.info("   TICKS SAVED INTO Cluster.")
   }

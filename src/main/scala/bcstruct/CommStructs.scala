@@ -76,6 +76,10 @@ case class seqTicksObj(
                     sqTicks :Seq[Tick]
                    )
 
+package object bcstruct {
+  type seqTicksWithReadDuration = (seqTicksObj, Long)
+}
+
 class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
 
   def simpleRound4Double(valueD : Double) = {

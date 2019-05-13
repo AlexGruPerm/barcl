@@ -61,13 +61,13 @@ assemblyMergeStrategy in assembly := {
   *
   */
 
+/*
 assemblyJarName in assembly :="ticksloader.jar"
 mainClass in (Compile, packageBin) := Some("bcapp.TicksLoader")
 mainClass in (Compile, run) := Some("bcapp.TicksLoader")
+*/
 
 
-/*
 assemblyJarName in assembly :="barcl.jar"
 mainClass in (Compile, packageBin) := Some("bcapp.BarsCalcApp")
 mainClass in (Compile, run) := Some("bcapp.BarsCalcApp")
-*/
