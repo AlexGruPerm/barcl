@@ -36,17 +36,14 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       logCalcProp(cp)
 
       val currReadInterval :(Long,Long) = (cp.beginFrom,
-        Seq(cp.beginFrom+readBySecs*1000L,
-          cp.tsLastTick match {
-            case Some(ts) => ts
-            case _ => cp.beginFrom
-          }).min)
+        Seq(cp.beginFrom+readBySecs*1000L, cp.tsLastTick.getOrElse(cp.beginFrom)).min)
 
+      //todo: rewrite on function with one line output
       logger.info(" In this iteration will read interval (PLAN) FROM: "+ currReadInterval._1+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) +")")
       logger.info("                                      (PLAN)   TO: "+ currReadInterval._2+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) +")")
 
       //todo: Make type definition and return this type instead of (seqTicksObj,Long)
-      def readTicksRecurs(readFromTs :Long, readToTs :Long) :/*(seqTicksObj,Long)*/ seqTicksWithReadDuration ={
+      def readTicksRecurs(readFromTs :Long, readToTs :Long) :seqTicksWithReadDuration ={
         val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
         if (seqTicks.sqTicks.isEmpty)
           (seqTicks,readMsec)

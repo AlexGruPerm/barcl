@@ -12,6 +12,7 @@ import scala.util.{Failure, Success, Try}
 
 
 
+
 /**
   *
   */
@@ -533,45 +534,34 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   }
 
 
+  /*
+  def debugTsPoints(tsPoints :Seq[Long],seqTicks: Seq[Tick]) ={
+    logger.debug("- barsSides.size=" + tsPoints.size)
+    logger.debug("from : " + seqTicks.head.db_tsunx)
+    logger.debug("to   : " + seqTicks.last.db_tsunx)
+  }
+  */
+
+
   /**
     * Calculate seq of Bars from seq of Ticks.
     *
-    * @param seqTicks - seq of Ticks were read from DB in prev step.
-    * @return
     */
   def getCalculatedBars(tickerId: Int, seqTicks: Seq[Tick], barDeepSec: Long): Seq[Bar] = {
-    //todo: add check here - seqTicks is noEmpty
+    val seqBarSides :Seq[TsPoint] = seqTicks.head.db_tsunx.to(seqTicks.last.db_tsunx).by(barDeepSec)
+                                    .zipWithIndex
+                                    .map(tsPoint.create)
 
-    val barsSides = seqTicks.head.db_tsunx.to(seqTicks.last.db_tsunx).by(barDeepSec)
+    val seqBarRanges :Seq[TsIntervalGrp] = seqBarSides.init.zip(seqBarSides.tail)
+      .map(TsIntervalGrp.create)
 
-    logger.debug("- barsSides.size=" + barsSides.size)
-    logger.debug("from : " + seqTicks.head.db_tsunx)
-    logger.debug("to   : " + seqTicks.last.db_tsunx)
+    def getGroupThisElement(elm: Long) :Int =
+      seqBarRanges.find(bs => bs.tsBegin <= elm && bs.tsEnd > elm)
+        .map(_.groupNumber).getOrElse(0)
 
-    //todo: maybe add type like "leftSideTs","rightSideTs" and use it instead of XXX._(1,2)
-    val seqBarSides = barsSides.zipWithIndex.map(elm => (elm._1, elm._2))
-    logger.debug("seqBarSides.size= " + seqBarSides.size)
-
-    val seqBar2Sides = for (i <- seqBarSides.indices) yield {
-      if (i < seqBarSides.last._2)
-        (seqBarSides(i)._1, seqBarSides(i + 1)._1, seqBarSides(i)._2 + 1)
-      else
-        (seqBarSides(i)._1, seqBarSides(i)._1, seqBarSides(i)._2 + 1)
-    }
-
-    //todo: rewrite with removing ._X
-
-    def getGroupThisElement(elm: Long) =
-      seqBar2Sides.find(bs => (bs._1 <= elm && bs._2 > elm) && (bs._2 - bs._1) == barDeepSec).map(_._3).getOrElse(0)
-
-    val seqSeqTicks: Seq[(Int, Seq[Tick])] = seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx)).filter(seqT => seqT._1 != 0).toSeq.sortBy(gr => gr._1)
-    seqSeqTicks.filter(sb => sb._1 != 0).map(elm =>
-      new Bar(
-        tickerId,
-        (barDeepSec / 1000L).toInt,
-        elm._2
-      )
-    )
+      seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx))
+      .filter(_._1 != 0).toSeq.sortBy(_._1)
+      .map(elm => new Bar(tickerId,(barDeepSec/1000L).toInt,elm._2))
   }
 
 

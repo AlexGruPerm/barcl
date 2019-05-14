@@ -75,6 +75,31 @@ case class Tick(
 case class seqTicksObj(
                     sqTicks :Seq[Tick]
                    )
+/**
+  * class used inside bar
+*/
+case class TsPoint(
+                   ts    :Long,
+                   index :Int
+                  )
+
+object tsPoint{
+  def create(initVal :(Long,Int)) :TsPoint = {
+    new TsPoint(initVal._1,initVal._2)
+  }
+}
+
+case class TsIntervalGrp(
+                        tsBegin     :Long,
+                        tsEnd       :Long,
+                        groupNumber :Int
+                        )
+
+object TsIntervalGrp{
+  def create(initVal :(TsPoint,TsPoint)) :TsIntervalGrp = {
+    new TsIntervalGrp(initVal._1.ts, initVal._2.ts, initVal._2.index)
+  }
+}
 
 package object bcstruct {
   type seqTicksWithReadDuration = (seqTicksObj, Long)

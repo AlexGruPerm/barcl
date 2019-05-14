@@ -1,5 +1,31 @@
 
-Seq(1,2,3,4,5,6,7,8,9,10).grouped(3).toList
+val barDeepSec = 10
+
+val barsSides :Seq[Int] = Seq(1,4,7,10,  11,15,18,20   ,21,25,29,30,   39,42)
+
+val seqBarSides :Seq[(Int,Int)] = barsSides.head.to(barsSides.last).by(barDeepSec).zipWithIndex
+
+//seqBarRanges: scala.collection.immutable.IndexedSeq[(Int, Int, Int)]
+// = Vector((1,11, 1), (11,21, 2), (21,31, 3), (31,31, 4))
+
+
+val seqBarRanges = seqBarSides.init.zip(seqBarSides.tail)
+  .map(pair => (pair._1._1, pair._2._1, pair._2._2))
+
+
+/*
+val seqBarRanges = for (i <- seqBarSides.indices) yield {
+  if (i < seqBarSides.last._2)
+    (seqBarSides(i)._1, seqBarSides(i + 1)._1, seqBarSides(i)._2 + 1)
+  else
+    (seqBarSides(i)._1, seqBarSides(i)._1, seqBarSides(i)._2 + 1)
+}
+*/
+
+
+
+
+
 
 /*
 val seqMinsDdateTs :List[(Option[Long], Option[Long])] =

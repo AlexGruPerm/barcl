@@ -61,6 +61,10 @@ assemblyMergeStrategy in assembly := {
   *
   */
 
+//sbt -mem 2048 run
+//export _JAVA_OPTIONS="-Xms1024m -Xmx2G -Xss256m -XX:MaxPermSize=4G"
+//to ~/.bash_profile and restart terminal
+
 /*
 assemblyJarName in assembly :="ticksloader.jar"
 mainClass in (Compile, packageBin) := Some("bcapp.TicksLoader")
