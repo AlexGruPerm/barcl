@@ -83,7 +83,7 @@ case class TsPoint(
                    index :Int
                   )
 
-object tsPoint{
+object TsPoint{
   def create(initVal :(Long,Int)) :TsPoint = {
     new TsPoint(initVal._1,initVal._2)
   }

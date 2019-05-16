@@ -1,8 +1,8 @@
 package bcapp
 
 import bcpackage.BarRangeCalculator
-import org.slf4j.LoggerFactory
 import com.typesafe.config.{Config, ConfigFactory}
+import org.slf4j.LoggerFactory
 
 import collection.JavaConverters._
 import scala.collection.breakOut
@@ -13,7 +13,7 @@ import scala.collection.breakOut
 */
 
 object BarsRanger extends App {
-  val config :Config = ConfigFactory.load(s"resources/application.conf")
+  val config :Config = ConfigFactory.load(s"application.conf")
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   val dbType: String = "cassandra"

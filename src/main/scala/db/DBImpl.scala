@@ -225,7 +225,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
        :p_ddate_res,
        :p_c_res,
        :p_res_type
-       ) """)
+       ) """).bind()
   /*
   val bndSaveFa =session.prepare(
     """ insert into mts_bars.bars_fa(ticker_id,    ddate,    bar_width_sec,    ts_end,     prcnt,    res_type,    res )
@@ -545,12 +545,11 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   /**
     * Calculate seq of Bars from seq of Ticks.
-    *
     */
   def getCalculatedBars(tickerId: Int, seqTicks: Seq[Tick], barDeepSec: Long): Seq[Bar] = {
     val seqBarSides :Seq[TsPoint] = seqTicks.head.db_tsunx.to(seqTicks.last.db_tsunx).by(barDeepSec)
                                     .zipWithIndex
-                                    .map(tsPoint.create)
+                                    .map(TsPoint.create)
 
     val seqBarRanges :Seq[TsIntervalGrp] = seqBarSides.init.zip(seqBarSides.tail)
       .map(TsIntervalGrp.create)
@@ -561,7 +560,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
       seqTicks.groupBy(elm => getGroupThisElement(elm.db_tsunx))
       .filter(_._1 != 0).toSeq.sortBy(_._1)
-      .map(elm => new Bar(tickerId,(barDeepSec/1000L).toInt,elm._2))
+      .map(elm => new Bar(tickerId, (barDeepSec/1000L).toInt, elm._2))
   }
 
 
@@ -660,16 +659,29 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
 
 
-
   /**
     * Save results of Future analyze into DB mts_bars.bars_fa
     */
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB]) :Unit = {
+     for(t <- seqFA) {
+       session.execute(bndSaveFa
+         .setInt("p_ticker_id", t.tickerId)
+         .setDate("p_ddate", t.dDate)
+         .setInt("p_bar_width_sec", t.barWidthSec)
+         .setLong("p_ts_end", t.ts_end)
+         .setDouble("p_c", t.c)
+         .setDouble("p_log_oe", t.log_oe)
+         .setLong("p_ts_end_res", t.ts_end_res)
+         .setInt("p_dursec_res", t.dursec_res)
+         .setDate("p_ddate_res", t.ddate_res)
+         .setDouble("p_c_res", t.c_res)
+         .setString("p_res_type", t.res_type)
+       )
+     }
 
-    val partsSeqBarFa = seqFA.grouped(50)//other limit 65535 for tiny rows.
-
+    /*
+        val partsSeqBarFa = seqFA.grouped(20)
     for(thisPartOfSeq <- partsSeqBarFa) {
-      //logger.debug("INSIDE [saveBarsFutAnal] SIZE OF thisPartOfSeq = "+thisPartOfSeq.size)
       var batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
       thisPartOfSeq.foreach {
         t =>
@@ -689,12 +701,13 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       }
       session.execute(batch)
     }
+    */
   }
   /** ------------------------------------------------------- */
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
     session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
-       .filter(r =>  r.tickerId == 18 /*&& Seq(30).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       //.filter(r =>  r.tickerId == 18 /*&& Seq(30).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
   }
 

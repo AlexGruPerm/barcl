@@ -1,6 +1,6 @@
 package bcpackage
 
-import bcstruct.bcstruct.{seqTicksWithGroup, seqTicksWithReadDuration}
+import bcstruct.bcstruct.{seqTicksWithReadDuration}
 import bcstruct.{Bar, CalcProperties, CalcProperty}
 import com.datastax.driver.core
 import db.{DBCass, DBImpl}

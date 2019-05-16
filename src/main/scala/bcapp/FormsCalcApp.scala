@@ -8,7 +8,7 @@ import collection.JavaConverters._
 import scala.collection.breakOut
 
 object FormsCalcApp extends App {
-  val config :Config = ConfigFactory.load(s"resources/application.conf")
+  val config :Config = ConfigFactory.load(s"application.conf")
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   val dbType :String = "cassandra"

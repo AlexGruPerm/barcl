@@ -21,22 +21,25 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
   def calcIteration(dbInst :DBImpl) = {
     val allBarsHistMeta :Seq[barsMeta] = dbInst.getAllBarsHistMeta
     logger.info("allBarsHistMeta.size="+allBarsHistMeta.size)
+
     allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.foreach {
         case (tickerID: Int, barWidthSec: Int) =>
           logger.info("BEFORE getLastBarFaTSEnd tickerID="+tickerID+" barWidthSec="+barWidthSec)
 
         val lastFaCalcedDdate: LocalDate = dbInst.getLastBarFaTSEnd(tickerID, barWidthSec) match {
           case Some(nnDdate) => nnDdate
-          case None => allBarsHistMeta.filter(b => b.tickerId == tickerID && b.barWidthSec==barWidthSec).map(b => b.dDate).min
+          case None => allBarsHistMeta.filter(b => b.tickerId == tickerID && b.barWidthSec == barWidthSec).map(_.dDate).min
         }
           logger.info("lastFaCalcedDdate ="+lastFaCalcedDdate)
 
         val tRead1 = System.currentTimeMillis
+
         val allBars: Seq[barsForFutAnalyze] = dbInst.getAllCalcedBars(allBarsHistMeta.filter(
           r =>
             r.tickerId == tickerID &&
             r.barWidthSec == barWidthSec &&
             r.dDate.getDaysSinceEpoch >= lastFaCalcedDdate.getDaysSinceEpoch))
+
           val tRead2 = System.currentTimeMillis
           logger.info("Read all bars Duration = "+(tRead2 - tRead1) + " msecs.")
 

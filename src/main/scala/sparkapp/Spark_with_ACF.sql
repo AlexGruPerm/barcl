@@ -1,4 +1,4 @@
-spark-shell --driver-memory 3G --executor-memory 5G  --executor-cores 1 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --conf "spark.cassandra.connection.host=192.168.122.192"
+spark-shell --driver-memory 3G --executor-memory 5G  --executor-cores 1 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --jars "/opt/spark-2.3.2/jars/" --conf "spark.cassandra.connection.host=192.168.122.192"
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.round
@@ -44,7 +44,8 @@ case class ccLibSvm(label    :Int,
                 col("bar_width_sec")
                 ).distinct.sort(asc("ticker_id"),asc("bar_width_sec")).as[FormKeys]}
 
-val dsKeys = getKeysFormsDb;
+val dsKeys = getKeysFormsDb
+dsKeys.cache()
 dsKeys.show()
 
  def getFormsDb(TickerID :Int, BarWidthSec: Int) :Dataset[Form] = {
