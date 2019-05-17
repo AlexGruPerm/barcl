@@ -1,4 +1,5 @@
-spark-shell --driver-memory 8G --executor-memory 8G  --executor-cores 1 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --jars "/opt/spark-2.3.2/jars/"  --conf spark.driver.maxResultSize=8G --conf "spark.cassandra.connection.host=192.168.122.192"
+
+spark-shell --driver-memory 8G --executor-memory 8G  --executor-cores 1 --jars "/opt/spark-2.3.2/jars/spark-cassandra-connector-assembly-2.3.2.jar" --jars "/opt/spark-2.3.2/jars/jpmml-sparkml-executable-1.4-SNAPSHOT.jar"  --conf spark.driver.maxResultSize=8G --conf "spark.cassandra.connection.host=192.168.122.192"
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.round
@@ -90,6 +91,7 @@ val seqDsForms :Seq[Dataset[Form]] = dsKeys.collect.toSeq.map(elm => getFormsDb(
 val ds :Dataset[Form] = seqDsForms.reduce(_ union _)
 ds.cache()
 ds.count()
+ds.printSchema()
 
 res6: Long = 509037
 
@@ -151,6 +153,9 @@ println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
 val t2 = System.currentTimeMillis
 println("Duration of FormsBuilder.run() - "+(t2 - t1)/1000 + " sec.")
 
+
+
+
 scala> println(s"Test set accuracy = ${evaluator.evaluate(predictionAndLabels)}")
 Test set accuracy = 0.51
 Duration of FormsBuilder.run() - 510 sec.
@@ -201,7 +206,7 @@ sqlInitialTransformer.setStatement("""
                          round((frmconfpeak - round(frmconfpeak/100)*100)/10) as f2,
                          (frmconfpeak % 10) as f3
                         FROM __THIS__
-                       """).transform(ds).show
+                       """).transform(ds)
 
 val ds1 = sqlInitialTransformer.transform(ds)
 
