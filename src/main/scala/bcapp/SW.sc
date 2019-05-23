@@ -1,4 +1,5 @@
 
+/*
 val p = Option(1)
 
 p.map(_*2).getOrElse(0)
@@ -6,6 +7,7 @@ p.map(_*2).getOrElse(0)
 p.getOrElse(0)
 
 p.fold(0)(_*2)
+*/
 
 /*
 
