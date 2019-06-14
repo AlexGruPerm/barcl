@@ -50,7 +50,6 @@ def showLogs(ds :Dataset[Form]) = println(" SIZE = "+ds.count)
 
 -- OK
 
-
 val ds :Dataset[Form] = Seq(1,3,5).map(elm => getFormsDb(elm,30)).reduce(_ union _)
 ds.cache()
 showLogs(ds)

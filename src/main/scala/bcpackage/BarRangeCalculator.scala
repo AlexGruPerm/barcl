@@ -2,7 +2,7 @@ package bcpackage
 
 import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta, barsResToSaveDB}
 import com.datastax.driver.core.LocalDate
-import com.madhukaraphatak.sizeof.SizeEstimator
+//import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
 
@@ -44,7 +44,7 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
           logger.info("Read all bars Duration = "+(tRead2 - tRead1) + " msecs.")
 
         logger.info("allBars BY [" + tickerID + "," + barWidthSec + "] SIZE = " + allBars.size + "  (" + allBars.head.ts_end + " - " + allBars.last.ts_end + ") " +
-          " (" + allBars.head.dDate + " - " + allBars.last.dDate + ") SIZE=" + SizeEstimator.estimate(dbInst) + " bytes.")
+          " (" + allBars.head.dDate + " - " + allBars.last.dDate + ") SIZE=" + /*SizeEstimator.estimate(dbInst) +*/ " bytes.")
 
         val prcntsDivSize = logOpenExit.size
 

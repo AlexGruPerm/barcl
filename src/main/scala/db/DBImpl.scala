@@ -4,7 +4,7 @@ import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta, barsResToSaveDB
 import com.datastax.driver.core
 import com.datastax.driver.core.exceptions.NoHostAvailableException
 import com.datastax.driver.core._
-import com.madhukaraphatak.sizeof.SizeEstimator
+//import com.madhukaraphatak.sizeof.SizeEstimator
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -861,7 +861,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                 r.getDouble("ask"),
                 r.getDouble("bid"))
               )
-          logger.debug("  2. INTERNAL READ TICKS (" + (tickerID,ddate) + ") ROWS = "+seqTickOneDDate.size+" SIZE = "+ SizeEstimator.estimate(seqTickOneDDate)/1024L/1024L+" Mb.")
+          logger.debug("  2. INTERNAL READ TICKS (" + (tickerID,ddate) + ") ROWS = "+seqTickOneDDate.size+" SIZE = "+
+            /*SizeEstimator.estimate(seqTickOneDDate)/1024L/1024L+*/" Mb.")
         seqTickOneDDate.sortBy(e => e.db_tsunx)
     }.flatten.filter(elm => elm.db_tsunx >= tsMin && elm.db_tsunx <= tsMax)
   }

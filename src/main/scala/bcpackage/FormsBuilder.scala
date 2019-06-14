@@ -1,7 +1,7 @@
 package bcpackage
 
 import bcstruct.{bForm, barsFaMeta, barsResToSaveDB, tinyTick}
-import com.madhukaraphatak.sizeof.SizeEstimator
+//import com.madhukaraphatak.sizeof.SizeEstimator
 import db.{DBCass, DBImpl}
 import org.slf4j.{Logger, LoggerFactory}
 import com.datastax.driver.core.LocalDate
@@ -14,8 +14,9 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
     if (allFABars.nonEmpty)
       logger.info(" allFABars for " + (tickerId, barWidthSec) + " SIZE " + allFABars.size +
         "  (" + allFABars.head.ts_end + ") " +
-        " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE=" +
-        SizeEstimator.estimate(allFABars) / 1024L / 1024L + " Mb.")
+        " (" + allFABars.head.dDate + " - " + allFABars.last.dDate + ") SIZE="
+      // + SizeEstimator.estimate(allFABars) / 1024L / 1024L + " Mb."
+      )
      else logger.info(" allFABars for " + (tickerId, barWidthSec) + " SIZE = 0 EMPTY !")
   }
 
@@ -43,8 +44,8 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
   }
 
   def logReadTicks(seqFormAllTinyTicks: Seq[tinyTick], sumReadDuration: Long): Unit = {
-    logger.info(" Summart read ticks COUNT=[" + seqFormAllTinyTicks.size + "] SIZE =[" +
-      SizeEstimator.estimate(seqFormAllTinyTicks) / 1024L / 1024L + "] Mb. Duration = " + sumReadDuration + "msec.")
+    logger.info(" Summart read ticks COUNT=[" + seqFormAllTinyTicks.size + "] SIZE =[" +/*
+      SizeEstimator.estimate(seqFormAllTinyTicks) / 1024L / 1024L +*/ "] Mb. Duration = " + sumReadDuration + "msec.")
   }
 
   def gedbugMinDdates(minDdateTsFromBForms: Option[(LocalDate, Long)], tickerId: Int,
@@ -55,8 +56,8 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
   }
 
   def logSeqForms(seqForms: Seq[bForm]): Unit = {
-    logger.info(" seqForms.ROWS=[" + seqForms.size + "] SIZE =[" +
-      SizeEstimator.estimate(seqForms) / 1024L + "] Kb.")
+    logger.info(" seqForms.ROWS=[" + seqForms.size + "] SIZE =[" +/*
+      SizeEstimator.estimate(seqForms) / 1024L +*/ "] Kb.")
   }
 
   /**
@@ -126,8 +127,8 @@ class FormsBuilder(nodeAddress: String, prcntsDiv: Seq[Double], formDeepKoef: In
                 }
             }
 
-        logger.debug("lastBarsOfFormsAllTickers ROWS=" + lastBarsOfFormsAllTickers.size + " SIZE OF WHOLE  = " +
-          SizeEstimator.estimate(lastBarsOfFormsAllTickers) / 1024L + " Kb.")
+        logger.debug("lastBarsOfFormsAllTickers ROWS=" + lastBarsOfFormsAllTickers.size + " SIZE OF WHOLE  = " +/*
+          SizeEstimator.estimate(lastBarsOfFormsAllTickers) / 1024L +*/ " Kb.")
 
         val (firstBarOfLastBars: barsResToSaveDB, lastBarOfLastBars: barsResToSaveDB) =
           lastBarsOfFormsAllTickers map (_._2) filter (_.tickerId == currentTickerId)
