@@ -1,7 +1,7 @@
 package bcpackage
 
-import bcstruct.bcstruct.{seqTicksWithReadDuration}
-import bcstruct.{Bar, CalcProperties, CalcProperty}
+import bcstruct.bcstruct.seqTicksWithReadDuration
+import bcstruct.{Bar, CalcProperties, CalcProperty, seqTicksObj}
 import com.datastax.driver.core
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
@@ -55,7 +55,15 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
           (seqTicks,readMsec)
       }
 
-      val (seqTicks,readMsec) :seqTicksWithReadDuration = readTicksRecurs(currReadInterval._1, currReadInterval._2)
+      val (seqTicks,readMsec) :seqTicksWithReadDuration =
+        try {
+          readTicksRecurs(currReadInterval._1, currReadInterval._2)
+        } catch {
+          case ex :com.datastax.driver.core.exceptions.OperationTimedOutException  => logger.error("-1- ex when call readTicksRecurs ["+ex.getMessage+"] ["+ex.getCause+"]")
+            (seqTicksObj(Nil),0L)
+          case e :Throwable => logger.error("-2- ex when call readTicksRecurs ["+e.getMessage+"] ["+e.getCause+"]")
+            (seqTicksObj(Nil),0L)
+        }
 
       if (seqTicks.sqTicks.nonEmpty) {
         val bars :Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec*1000L)

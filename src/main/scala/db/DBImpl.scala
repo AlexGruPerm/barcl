@@ -146,7 +146,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                  ddate <= :pMaxDate and
                  db_tsunx >= :dbTsunxBegin and
                  db_tsunx <= :dbTsunxEnd
-           allow filtering; """).bind()
+           allow filtering; """).setIdempotent(true).bind()
 
   /**
     * Save one bar.
@@ -186,10 +186,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             :p_ticks_cnt,
             :p_disp,
             :p_log_co
-            ); """).bind()
+            ); """).setIdempotent(true).bind()
 
   val bndBarsHistMeta = session.prepare(
-    """ select distinct ticker_id,bar_width_sec,ddate from mts_bars.bars allow filtering; """).bind()
+    """ select distinct ticker_id,bar_width_sec,ddate from mts_bars.bars allow filtering; """).setIdempotent(true).bind()
 
   val bndBarsHistData = session.prepare(
     """ select ts_begin,ts_end,o,h,l,c
@@ -528,6 +528,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .setLong("dbTsunxEnd", tsEnd)
     ).all().iterator.asScala.toSeq.map(r => rowToSeqTicks(r, cp.tickerId)).sortBy(t => t.db_tsunx)
     )
+
     val t2 = System.currentTimeMillis
     logger.debug("Inside getTicksByInterval. Read interval " + tsBegin + " - " + tsEnd + " diration=" + (t2 - t1) + " Ticks Size=" + sqt.sqTicks.size)
     (sqt, t2 - t1)
