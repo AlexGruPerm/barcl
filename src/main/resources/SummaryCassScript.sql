@@ -407,3 +407,13 @@ create table mts_ml.result(
  p1    double,
  PRIMARY KEY (label, frmconfpeak, prediction, p0,p1)
 );
+
+CREATE MATERIALIZED VIEW mts_bars.mv_bars as
+select ticker_id,ddate
+  from mts_bars.bars
+ where ticker_id IS NOT NULL AND
+       ddate  IS NOT NULL AND
+       bar_width_sec IS NOT NULL AND
+       ts_end  IS NOT NULL
+    PRIMARY KEY (ticker_id, ddate, bar_width_sec ,ts_end)
+       WITH CLUSTERING ORDER BY (ddate desc);

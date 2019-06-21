@@ -17,9 +17,9 @@ import org.slf4j.LoggerFactory
 
 object BarsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
-  val node: String = "192.168.122.192" // "10.241.5.234"
+  val node: String = "193.124.112.90"
   val dbType: String = "cassandra"
-  val readBySecs: Long = 60 * 60 * 24 //12 //read by 12 hours.
+  val readBySecs: Long = 60 * 60 * 24
   try {
     (new BarCalculator(node, dbType, readBySecs)).run
   } catch {
