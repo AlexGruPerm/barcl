@@ -408,12 +408,19 @@ create table mts_ml.result(
  PRIMARY KEY (label, frmconfpeak, prediction, p0,p1)
 );
 
-CREATE MATERIALIZED VIEW mts_bars.mv_bars as
-select ticker_id,ddate
-  from mts_bars.bars
- where ticker_id IS NOT NULL AND
-       ddate  IS NOT NULL AND
-       bar_width_sec IS NOT NULL AND
-       ts_end  IS NOT NULL
-    PRIMARY KEY (ticker_id, ddate, bar_width_sec ,ts_end)
-       WITH CLUSTERING ORDER BY (ddate desc);
+
+drop table mts_bars.bars_bws_dates;
+
+/*
+ Contain only last ddate for each key (tickerID + bar_width_sec)
+ added to wide optimization of read ,ts_bars.bars.
+ For removing queries like this:
+ select distinct ticker_id,bar_width_sec,ddate from mts_bars.bars allow filtering
+ For removing "allow filtering"
+*/
+CREATE TABLE mts_bars.bars_bws_dates(
+	ticker_id     int,
+	bar_width_sec int,
+	ddate         date,
+	PRIMARY KEY (ticker_id ,bar_width_sec)
+);

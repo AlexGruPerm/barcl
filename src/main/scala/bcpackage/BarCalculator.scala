@@ -1,7 +1,7 @@
 package bcpackage
 
 import bcstruct.bcstruct.seqTicksWithReadDuration
-import bcstruct.{Bar, CalcProperties, CalcProperty, seqTicksObj}
+import bcstruct._
 import com.datastax.driver.core
 import db.{DBCass, DBImpl}
 import org.slf4j.LoggerFactory
@@ -28,9 +28,24 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
   }
 
-  def calcIteration(dbInst :DBImpl) :Unit = {
-    val allCalcProps :CalcProperties = dbInst.getAllCalcProperties
+  def calcIteration(dbInst :DBImpl,fTicksMeta :Seq[FirstTickMeta]) :Unit = {
+    val allCalcProps :CalcProperties = dbInst.getAllCalcProperties(fTicksMeta)
     logger.info(" Size of all bar calculator properties is "+allCalcProps.cProps.size)
+
+    //todo: Make type definition and return this type instead of (seqTicksObj,Long)
+    def readTicksRecurs(readFromTs :Long, readToTs :Long, cp :CalcProperty) :seqTicksWithReadDuration = {
+      val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
+      if (seqTicks.sqTicks.isEmpty)
+        (seqTicks,readMsec)
+      else if (cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) <  readToTs)
+        (seqTicks,readMsec)
+      else if (seqTicks.sqTicks.size < cp.barDeepSec && cp.tsLastTick.getOrElse(0L) > readToTs)
+        readTicksRecurs(readFromTs, readToTs + (readToTs-readFromTs), cp)
+      else
+        (seqTicks,readMsec)
+    }
+
+
 
     allCalcProps.cProps.foreach{cp =>
       logCalcProp(cp)
@@ -42,6 +57,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       logger.info(" In this iteration will read interval (PLAN) FROM: "+ currReadInterval._1+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) +")")
       logger.info("                                      (PLAN)   TO: "+ currReadInterval._2+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) +")")
 
+      /*
       //todo: Make type definition and return this type instead of (seqTicksObj,Long)
       def readTicksRecurs(readFromTs :Long, readToTs :Long) :seqTicksWithReadDuration ={
         val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
@@ -54,10 +70,11 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
         else
           (seqTicks,readMsec)
       }
+      */
 
       val (seqTicks,readMsec) :seqTicksWithReadDuration =
         try {
-          readTicksRecurs(currReadInterval._1, currReadInterval._2)
+          readTicksRecurs(currReadInterval._1, currReadInterval._2,cp)
         } catch {
           case ex :com.datastax.driver.core.exceptions.OperationTimedOutException  => logger.error("-1- ex when call readTicksRecurs ["+ex.getMessage+"] ["+ex.getCause+"]")
             (seqTicksObj(Nil),0L)
@@ -93,9 +110,14 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     val t2 = System.currentTimeMillis
     logger.info("Duration of barCalc.run() - "+(t2 - t1) + " msecs.")
     */
+
+    //todo: get here firstTickTS for each ticker and send inside calcIteration, to eliminate unnecessary reads.
+    val fTicksMeta :Seq[FirstTickMeta] = dbInst.getFirstTicksMeta
+
+
     while(true){
       val t1 = System.currentTimeMillis
-      calcIteration(dbInst)
+      calcIteration(dbInst,fTicksMeta)
       val t2 = System.currentTimeMillis
       logger.info("Duration of ITERATION barCalc.run() - "+(t2 - t1) + " msecs.")
     }

@@ -1,9 +1,7 @@
 import com.datastax.driver.core.exceptions.NoHostAvailableException
-import db.{DBCass}
+import db.DBCass
 import org.scalatest.FunSuite
 import org.slf4j.LoggerFactory
-
-import scala.util.{Failure, Success}
 
 class CassConnectTest extends FunSuite {
   val logger = LoggerFactory.getLogger(getClass.getName)
@@ -19,6 +17,7 @@ class CassConnectTest extends FunSuite {
     }
   }
 
+  /*
   test("3. QueriesBinds created with closed session should throw IllegalArgumentException") {
     val dbCassImpl = new DBCass("10.241.5.234","cassandra")
     val session = dbCassImpl.getTrySession
@@ -33,8 +32,8 @@ class CassConnectTest extends FunSuite {
             println("no test here")
           }
         }
-
     }
+  */
 
 /*
   test("4. QueriesBinds created with NULL as session should throw IllegalArgumentException") {

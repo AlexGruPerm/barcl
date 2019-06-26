@@ -11,31 +11,13 @@ case class CalcProperty(tickerId      :Int,
                         barDeepSec    :Int,
                         isEnabled     :Int,
                         //-----------------
-                        tsEndLastBar       :Option[Long],
+                        tsEndLastBar  :Option[Long],
                         //-----------------
                         dDateLastTick :Option[LocalDate],
                         tsLastTick    :Option[Long],
                         //-----------------
-                        tsFirstTicks  :Option[Long]
+                        tsFirstTicks  :Option[Long]//todo: it's not necessary to read it on each iterations.
                        ){
-  /*
-  REWRITE IT WITH getOrElse(0L)
-
-  require({tsEndLastBar match {
-    case Some(thisTsEndLastBar) => {
-      tsLastTick match {
-        case Some(thisTsLastTick) => thisTsEndLastBar <= thisTsLastTick
-        case _ => true
-      }
-    }
-    case _ =>  {
-      tsLastTick match {
-        case Some(thisTsLastTick) => 0L <= thisTsLastTick
-        case _ => true
-    }}
-  }
-  },"TS End last bar must be less than TS End last tick.")
-  */
 
   val beginFrom = tsEndLastBar.getOrElse(
     tsFirstTicks.getOrElse(
@@ -44,6 +26,17 @@ case class CalcProperty(tickerId      :Int,
   val diffLastTickTSBarTS = tsLastTick.getOrElse(0L)/1000L - beginFrom/1000L
 
 }
+
+/**
+  * Meta information for first ticks for bars calculator.
+  * Optimization from 26.06.2019
+*/
+case class FirstTickMeta(tickerId   :Int,
+                         firstDdate :Option[LocalDate],
+                         firstTs    :Option[Long]
+                        )
+
+
 
 /**
   * Contains all CalcProperty(s)
