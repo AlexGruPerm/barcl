@@ -1,4 +1,14 @@
 
+
+def a :Boolean = true
+def b :Boolean = false
+
+if (a && b)
+  println("TRUE")
+ else
+  println("FALSE")
+
+
 /*
 val p = Option(1)
 

@@ -609,6 +609,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     val pDate :LocalDate = LocalDate.fromMillisSinceEpoch(tsBegin)
 
     val sqt = if (LocalDate.fromMillisSinceEpoch(tsBegin) == LocalDate.fromMillisSinceEpoch(tsEnd)) {
+      //logger.info("  getTicksByInterval branch = 1 pDate="+pDate)
       seqTicksObj(session.execute(bndTicksByTsIntervalONEDate
         .setInt("tickerId", cp.tickerId)
         .setDate("pDate", pDate)
@@ -616,6 +617,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         .setLong("dbTsunxEnd", tsEnd)
       ).all().iterator.asScala.toSeq.map(r => rowToSeqTicksWDate(r, cp.tickerId, pDate)).sortBy(t => t.db_tsunx))
     } else {
+      //logger.info("  getTicksByInterval branch = 2 pMinDate="+LocalDate.fromMillisSinceEpoch(tsBegin)+" pMaxDate="+LocalDate.fromMillisSinceEpoch(tsEnd))
       seqTicksObj(session.execute(bndTicksByTsInterval
         .setInt("tickerId", cp.tickerId)
         .setDate("pMinDate", LocalDate.fromMillisSinceEpoch(tsBegin))

@@ -32,8 +32,40 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     val allCalcProps :CalcProperties = dbInst.getAllCalcProperties(fTicksMeta)
     logger.info(" Size of all bar calculator properties is "+allCalcProps.cProps.size)
 
+    /**
+      * & <-- verifies both operands
+      * && <-- stops evaluating if the first operand evaluates to false since the result will be false
+    */
     //todo: Make type definition and return this type instead of (seqTicksObj,Long)
     def readTicksRecurs(readFromTs :Long, readToTs :Long, cp :CalcProperty) :seqTicksWithReadDuration = {
+      val (seqTicks, readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
+  /*
+      logger.info(" > Inside readTicksRecurs readFromTs=" + readFromTs + " readToTs=" + readToTs +
+        " seqTicks.size=" + seqTicks.sqTicks.size+" cp.tsLastTick.getOrElse(0L)="+cp.tsLastTick.getOrElse(0L)+
+      " cp.barDeepSec="+cp.barDeepSec)
+      logger.info("   > head-last sec. ="+(seqTicks.sqTicks.last.db_tsunx/1000L - seqTicks.sqTicks.head.db_tsunx/1000L))
+*/
+      if (seqTicks.sqTicks.isEmpty)
+        (seqTicks, readMsec)
+
+      else if (cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) < readToTs) {
+        //logger.info(" -1- readTicksRecurs")
+        (seqTicks, readMsec)
+      }
+
+      else if ( /*seqTicks.sqTicks.size*/(seqTicks.sqTicks.last.db_tsunx/1000L - seqTicks.sqTicks.head.db_tsunx/1000L) < cp.barDeepSec && cp.tsLastTick.getOrElse(0L) > readToTs) {
+        //logger.info(" -2- readTicksRecurs")
+        readTicksRecurs(readFromTs, readToTs + (readToTs - readFromTs), cp)
+      }
+
+      else {
+        //logger.info(" -3- readTicksRecurs")
+      (seqTicks, readMsec)
+      }
+    }
+
+    /*
+        def readTicksRecurs(readFromTs :Long, readToTs :Long, cp :CalcProperty) :seqTicksWithReadDuration = {
       val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
       if (seqTicks.sqTicks.isEmpty)
         (seqTicks,readMsec)
@@ -44,7 +76,7 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       else
         (seqTicks,readMsec)
     }
-
+    */
 
 
     allCalcProps.cProps.foreach{cp =>
@@ -57,21 +89,6 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
       logger.info(" In this iteration will read interval (PLAN) FROM: "+ currReadInterval._1+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) +")")
       logger.info("                                      (PLAN)   TO: "+ currReadInterval._2+" ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) +")")
 
-      /*
-      //todo: Make type definition and return this type instead of (seqTicksObj,Long)
-      def readTicksRecurs(readFromTs :Long, readToTs :Long) :seqTicksWithReadDuration ={
-        val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
-        if (seqTicks.sqTicks.isEmpty)
-          (seqTicks,readMsec)
-        else if (cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) <  readToTs)
-          (seqTicks,readMsec)
-        else if (seqTicks.sqTicks.size < cp.barDeepSec && cp.tsLastTick.getOrElse(0L) > readToTs)
-          readTicksRecurs(readFromTs, readToTs + (readToTs-readFromTs))
-        else
-          (seqTicks,readMsec)
-      }
-      */
-
       val (seqTicks,readMsec) :seqTicksWithReadDuration =
         try {
           readTicksRecurs(currReadInterval._1, currReadInterval._2,cp)
@@ -82,10 +99,13 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
             (seqTicksObj(Nil),0L)
         }
 
+      logger.info("readed recursively ticks SIZE="+seqTicks.sqTicks.size)
+
       if (seqTicks.sqTicks.nonEmpty) {
         val bars :Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec*1000L)
         if (bars.nonEmpty)
           dbInst.saveBars(bars)
+        else logger.info("bars is Empty no save")
       }
 
     }
