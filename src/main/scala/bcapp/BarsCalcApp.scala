@@ -15,9 +15,10 @@ import org.slf4j.LoggerFactory
   * readBySecs - read ticks by parts in seconds - 1 day by default.
   */
 
+//todo: add config with cassandra ip.
 object BarsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
-  val node: String = "193.124.112.90"
+  val node: String = "xx.xx.xx.xx"
   val dbType: String = "cassandra"
   val readBySecs: Long = 60 * 60 * 3
   try {
