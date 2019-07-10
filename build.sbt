@@ -10,6 +10,7 @@ libraryDependencies ++= Seq(
   "com.datastax.cassandra" % "cassandra-driver-core" % "3.7.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scala-lang" % "scala-library" % "2.12.4",
+  "com.typesafe" % "config" % "1.3.4",
   //"com.madhukaraphatak" %% "java-sizeof" % "0.1", unresolved for 2.12 scala
   "org.scalatest" %% "scalatest" % "3.0.5" % Test,
   "com.typesafe" % "config" % "1.3.4"
@@ -22,6 +23,8 @@ assemblyMergeStrategy in assembly := {
   case "logback.xml" => MergeStrategy.last
   case "resources/logback.xml" => MergeStrategy.last
   case "application.conf" => MergeStrategy.last
+  case "resources/control.conf" => MergeStrategy.discard
+  case "control.conf" => MergeStrategy.discard
   case PathList("reference.conf") => MergeStrategy.concat
   case x => MergeStrategy.first
 }

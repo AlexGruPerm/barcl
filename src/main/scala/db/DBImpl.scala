@@ -617,6 +617,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         .setLong("dbTsunxEnd", tsEnd)
       ).all().iterator.asScala.toSeq.map(r => rowToSeqTicksWDate(r, cp.tickerId, pDate)).sortBy(t => t.db_tsunx))
     } else {
+      //todo: replace here on read multiple times by distinct ddate and concatenate resulta with flatMap
       //logger.info("  getTicksByInterval branch = 2 pMinDate="+LocalDate.fromMillisSinceEpoch(tsBegin)+" pMaxDate="+LocalDate.fromMillisSinceEpoch(tsEnd))
       seqTicksObj(session.execute(bndTicksByTsInterval
         .setInt("tickerId", cp.tickerId)
