@@ -41,7 +41,6 @@ object BarsCalcApp extends App {
       throw e
   }
 
-
   val dbType: String = "cassandra"
   val node: String = config.getString(dbType+".src.ip")//"10.0.0.13"
   val readBySecs: Long = 60 * 60 * config.getInt(dbType+".readByHours")

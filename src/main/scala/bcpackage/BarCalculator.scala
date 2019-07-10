@@ -18,6 +18,8 @@ import scala.concurrent.{Await, Future}
 class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
+  logger.info("readBySecs="+readBySecs)
+
   def logCalcProp(cp :CalcProperty) ={
     logger.info("Calc property: -------------------------------------------------------------------------------------")
     logger.info(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" + "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
@@ -26,6 +28,12 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     logger.info(" First tick TS = "+cp.tsFirstTicks)
     logger.info(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
       Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
+  }
+
+  def intervalSecondsDouble(sqTicks :Seq[Tick]) :Double = {
+    //logger.info("sqTicks.last.db_tsunx="+sqTicks.last.db_tsunx)
+    //logger.info("sqTicks.head.db_tsunx="+sqTicks.head.db_tsunx)
+    (sqTicks.last.db_tsunx.toDouble - sqTicks.head.db_tsunx.toDouble) / 1000
   }
 
   def calcIteration(dbInst :DBImpl,fTicksMeta :Seq[FirstTickMeta]) :Unit = {
@@ -39,44 +47,47 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     //todo: Make type definition and return this type instead of (seqTicksObj,Long)
     def readTicksRecurs(readFromTs :Long, readToTs :Long, cp :CalcProperty) :seqTicksWithReadDuration = {
       val (seqTicks, readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
-  /*
-      logger.info(" > Inside readTicksRecurs readFromTs=" + readFromTs + " readToTs=" + readToTs +
-        " seqTicks.size=" + seqTicks.sqTicks.size+" cp.tsLastTick.getOrElse(0L)="+cp.tsLastTick.getOrElse(0L)+
-      " cp.barDeepSec="+cp.barDeepSec)
-      logger.info("   > head-last sec. ="+(seqTicks.sqTicks.last.db_tsunx/1000L - seqTicks.sqTicks.head.db_tsunx/1000L))
-*/
-      if (seqTicks.sqTicks.isEmpty)
-        (seqTicks, readMsec)
 
+      //**************************************************************************************************************
+      /*
+      logger.info(" > Inside readTicksRecurs readFromTs=" + readFromTs + " readToTs=" + readToTs +
+        " seqTicks.size=" + seqTicks.sqTicks.size + " cp.tsLastTick.getOrElse(0L)=" + cp.tsLastTick.getOrElse(0L) +
+        " cp.barDeepSec=" + cp.barDeepSec)
+      if (seqTicks.sqTicks.nonEmpty) {
+        logger.info("   > head-last sec.  intervalSeconds =" + intervalSecondsDouble(seqTicks.sqTicks))
+      } else {
+        logger.info("   > head-last sec.  intervalSeconds = 0 isEMPTY !")
+      }
+      */
+      //**************************************************************************************************************
+      //read from Friday last ticks and there is nth. to read and we have data in next days.
+      if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) > readToTs){
+        readTicksRecurs(readFromTs, readToTs + readBySecs * 1000L, cp)
+    }
+      else if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) <= readToTs){
+        (seqTicks, readMsec)
+    }
       else if (cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) < readToTs) {
         //logger.info(" -1- readTicksRecurs")
         (seqTicks, readMsec)
       }
-
-      else if ( /*seqTicks.sqTicks.size*/(seqTicks.sqTicks.last.db_tsunx/1000L - seqTicks.sqTicks.head.db_tsunx/1000L) < cp.barDeepSec && cp.tsLastTick.getOrElse(0L) > readToTs) {
+      else if (seqTicks.sqTicks.nonEmpty && intervalSecondsDouble(seqTicks.sqTicks) < cp.barDeepSec.toDouble &&
+        cp.tsLastTick.getOrElse(0L) > readToTs) {
         //logger.info(" -2- readTicksRecurs")
-        readTicksRecurs(readFromTs, readToTs + (readToTs - readFromTs), cp)
+        /**
+          * OLD CODE: readTicksRecurs(readFromTs, readToTs + (readToTs - readFromTs), cp)
+          * with recursion on weekend produce recursive increasing interval step by step, +3h +6h +12h +24h +48h
+          * readFromTs is constant for whole function call.
+          * replace (readToTs - readFromTs) with static interval
+        */
+        readTicksRecurs(readFromTs, readToTs + readBySecs*1000L, cp)
       }
-
       else {
-        //logger.info(" -3- readTicksRecurs")
+       // logger.info(" -3- readTicksRecurs")
       (seqTicks, readMsec)
       }
     }
 
-    /*
-        def readTicksRecurs(readFromTs :Long, readToTs :Long, cp :CalcProperty) :seqTicksWithReadDuration = {
-      val (seqTicks,readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
-      if (seqTicks.sqTicks.isEmpty)
-        (seqTicks,readMsec)
-      else if (cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) <  readToTs)
-        (seqTicks,readMsec)
-      else if (seqTicks.sqTicks.size < cp.barDeepSec && cp.tsLastTick.getOrElse(0L) > readToTs)
-        readTicksRecurs(readFromTs, readToTs + (readToTs-readFromTs), cp)
-      else
-        (seqTicks,readMsec)
-    }
-    */
 
 
     allCalcProps.cProps.foreach{cp =>
@@ -95,16 +106,24 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
         } catch {
           case ex :com.datastax.driver.core.exceptions.OperationTimedOutException  => logger.error("-1- ex when call readTicksRecurs ["+ex.getMessage+"] ["+ex.getCause+"]")
             (seqTicksObj(Nil),0L)
-          case e :Throwable => logger.error("-2- ex when call readTicksRecurs ["+e.getMessage+"] ["+e.getCause+"]")
-            (seqTicksObj(Nil),0L)
+         //todo: Fix it, commented 10.07.2019
+          // case e :Throwable => logger.error("-2- EXCEPTION when call readTicksRecurs ["+e.getMessage+"] ["+e.getCause+"]")
+         //   (seqTicksObj(Nil),0L)
         }
 
       logger.info("readed recursively ticks SIZE="+seqTicks.sqTicks.size)
+      //todo: remove it !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      //seqTicks.sqTicks.foreach(t => logger.info(t.toString))
+
 
       if (seqTicks.sqTicks.nonEmpty) {
-        val bars :Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec*1000L)
-        if (bars.nonEmpty)
-          dbInst.saveBars(bars)
+        val bars: Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec * 1000L)
+        if (bars.nonEmpty) {
+          //logger.info("bars Non Empty save it. bars.size="+bars.size)
+          //logger.info("begin: " + bars.head.ts_begin)
+          //logger.info("end:   " + bars.head.ts_end)
+        dbInst.saveBars(bars)
+      }
         else logger.info("bars is Empty no save")
       }
 
@@ -132,8 +151,9 @@ class BarCalculator(nodeAddress :String, dbType :String, readBySecs :Long) {
     */
 
     //todo: get here firstTickTS for each ticker and send inside calcIteration, to eliminate unnecessary reads.
-    val fTicksMeta :Seq[FirstTickMeta] = dbInst.getFirstTicksMeta
+    val fTicksMeta :Seq[FirstTickMeta] = dbInst.getFirstTicksMeta/*.filter(_.tickerId==25)*/ //todo: debug - remove it
 
+    logger.info("fTicksMeta=["+fTicksMeta+"]")
 
     while(true){
       val t1 = System.currentTimeMillis

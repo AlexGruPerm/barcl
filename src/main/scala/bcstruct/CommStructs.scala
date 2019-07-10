@@ -63,7 +63,10 @@ case class Tick(
                  db_tsunx  :Long,
                  ask       :Double,
                  bid       :Double
-               )
+               ) {
+  override def toString: String =
+    dDate.toString+" - "+db_tsunx
+}
 
 case class seqTicksObj(
                     sqTicks :Seq[Tick]
@@ -114,9 +117,27 @@ class Bar (p_ticker_id : Int, p_bar_width_sec : Int, barTicks : Seq[Tick]) {
 
   val ticker_id       :Int = p_ticker_id
   val ddate           :Long =  barTicks.last.db_tsunx// barTicks(0).db_tsunx
+  val ddateFromTick   :LocalDate = barTicks.last.dDate
   val bar_width_sec   :Int= p_bar_width_sec
   val ts_begin        :Long = barTicks(0).db_tsunx
-  val ts_end          :Long = barTicks.last.db_tsunx
+  /**
+    * It was barTicks.last.db_tsunx, but exists cases when
+    * we have barTicks with just 1 ticks. For example we read seq of ticks with size 4
+    * And calculate bars with BWS=30.
+    * And in our seq interval between 1-st and 2-nd ticks is 49 sec.
+    * We need calculate ts_end as ts_begin + bar_width_sec (*1000)
+    * It was bad idea when (ts_begin = ts_end in BAR)
+    * OLD CODE:
+    * val ts_end :Long = barTicks.last.db_tsunx
+    *
+  */
+  val ts_end          :Long = if (barTicks.size==1) ts_begin+bar_width_sec*1000L else barTicks.last.db_tsunx
+/*
+  println(" >>>> INSIDE CONSTRUCTOR BAR: barTicks.size="+barTicks.size+" ts_begin="+ts_begin+" ts_end="+ts_end+" ddate(ts_begin)="+core.LocalDate.fromMillisSinceEpoch(ts_begin)
+    +"  ddate(barTicks.last.db_tsunx)="+core.LocalDate.fromMillisSinceEpoch(ddate)+" possibleDDATE="+ddateFromTick
+  )
+  */
+
   val o               :Double = simpleRound5Double((barTicks(0).ask + barTicks(0).bid)/2)
   val h               :Double = simpleRound5Double(barTicks.map(x => (x.ask+x.bid)/2).max)
   val l               :Double = simpleRound5Double(barTicks.map(x => (x.ask+x.bid)/2).min)

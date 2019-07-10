@@ -105,6 +105,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def close() = session.close()
 
+  //todo: debug - remove it -  where ticker_id=1 and bar_width_sec=30
   val bndBCalcProps = session.prepare(""" select * from mts_meta.bars_property; """).bind()
 
   /*
@@ -518,9 +519,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
     }
 
-    CalcProperties(bndBCalcPropsDataSet
+    CalcProperties(
+      bndBCalcPropsDataSet
       .toSeq.map(rowToCalcProperty)
-      //.sortBy(sr => (sr.tickerId, sr.barDeepSec)) // todo: opt#2 maybe remove sorts at all.
     )
   }
 
@@ -674,7 +675,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     for (b <- seqBarsCalced) {
       session.execute(bndSaveBar
         .setInt("p_ticker_id", b.ticker_id)
-        .setDate("p_ddate", core.LocalDate.fromMillisSinceEpoch(b.ddate)) //*1000
+        .setDate("p_ddate", b.ddateFromTick)//todo: replaced 10.07.2019 core.LocalDate.fromMillisSinceEpoch(b.ddate))
         .setInt("p_bar_width_sec", b.bar_width_sec)
         .setLong("p_ts_begin", b.ts_begin)
         .setLong("p_ts_end", b.ts_end)
@@ -693,12 +694,17 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     val (tickerId :Int, bws :Int, maxDdate :LocalDate) = (
       seqBarsCalced.head.ticker_id,
       seqBarsCalced.head.bar_width_sec,
-      core.LocalDate.fromMillisSinceEpoch(seqBarsCalced.maxBy(_.ddate).ddate))
+      seqBarsCalced.maxBy(_.ddateFromTick).ddateFromTick)
+    /**
+      *  replaced 10.07.2019
+      *  OLD CODE : core.LocalDate.fromMillisSinceEpoch(seqBarsCalced.maxBy(_.ddate).ddate))
+      *
+    */
 
     session.execute(bndSaveBarDdatesMeta
       .setInt("tickerId",tickerId)
       .setDate("pDdate",maxDdate)
-        .setInt("bws",bws)
+      .setInt("bws",bws)
     )
 
   }
