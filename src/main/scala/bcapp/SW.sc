@@ -1,7 +1,10 @@
-val f :Long = 1549663170362L
-val s :Long = 1549663200271L
 
-val interval1 :Double = s.toDouble/1000 - f.toDouble/1000
+val optInt :Option[Int] =
+ None
+// Option(345)
 
-val interval2 :Double = ((s.toDouble-f)/1000)
+
+optInt.map(v => v*10).getOrElse(0)
+optInt.flatMap(v => Option(v*10))
+
 
