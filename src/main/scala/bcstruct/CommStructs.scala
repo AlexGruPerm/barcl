@@ -3,6 +3,11 @@ package bcstruct
 import com.datastax.driver.core.LocalDate
 
 
+
+case class BarCalcProperty(tickerId  :Int,
+                           bws       :Int,
+                           isEnabled :Int)
+
 /**
   * Meta Information about which ticker and which deeps will be calculated.
   * And all information about last bar and first/last ticks.

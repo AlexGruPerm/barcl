@@ -25,7 +25,8 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
 
   def getFirstTicksMeta : Seq[FirstTickMeta]
 
-  def getAllCalcProperties(fTicksMeta :Seq[FirstTickMeta]) : CalcProperties
+  def getAllBarsProperties : Seq[BarCalcProperty]
+  def getAllCalcProperties(fTicksMeta :FirstTickMeta,bws :Int) : CalcProperties
   def getTicksByInterval(cp :CalcProperty, tsBegin :Long, tsEnd :Long) : (seqTicksObj,Long)
   def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
   def saveBars(seqBarsCalced :Seq[Bar])
@@ -380,6 +381,16 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
 
 
+  def getAllBarsProperties : Seq[BarCalcProperty] =
+    session.execute(bndBCalcProps).all().iterator.asScala.map(
+      row => BarCalcProperty(
+        row.getInt("ticker_id"),
+        row.getInt("bar_width_sec"),
+        row.getInt("is_enabled")
+      )
+    ).toList.filter(bp => bp.isEnabled==1)
+
+
 
   def getFirstTs(tickerId :Int, thisDdate :LocalDate) :Long =
     session.execute(bndFirstTickTs.setInt("tickerId",tickerId).setDate("pDdate",thisDdate))
@@ -413,37 +424,35 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   /**
     * Retrieve all calc properties, look at CF mts_meta.bars_property
-    *
+    * Here as input parameter we have only ONE element.
     * @return
     */
-  def getAllCalcProperties(fTicksMeta :Seq[FirstTickMeta]): CalcProperties = {
+  def getAllCalcProperties(fTicksMeta :FirstTickMeta, bws :Int): CalcProperties = {
     require(!session.isClosed)
 
-    val bndBCalcPropsDataSet = session.execute(bndBCalcProps).all().iterator.asScala
-
-    /**
-      * Func wide description:
-      */
-    val rowToCalcProperty = (rowCP: Row) => {
+    /*
+    fTicksMeta.tickerId   : Int
+    fTicksMeta.firstDdate : Option[LocalDate]
+    fTicksMeta.firstTs    : Option[Long]
+    bws                   : Int
+    */
 
       /**
         * Last bar max ddate
         */
       val maxDdate = session.execute(lastBarMaxDdate
-        .setInt("tickerId", rowCP.getInt("ticker_id"))
-        .setInt("barDeepSec", rowCP.getInt("bar_width_sec"))
+        .setInt("tickerId", fTicksMeta.tickerId)
+        .setInt("barDeepSec", bws)
       ).all().iterator.asScala.toSeq.map(row => {
         row.getDate("ddate")
-      }).headOption //.head
-
-      //select ddate from mts_bars.bars_bws_dates where ticker_id=:tickerId and bar_width_sec=:barDeepSec;
+      }).headOption
 
       /**
         * Last Bar
         */
       val lb: Option[LastBar] = (session.execute(bndLastBar
-        .setInt("tickerId", rowCP.getInt("ticker_id"))
-        .setInt("barDeepSec", rowCP.getInt("bar_width_sec"))
+        .setInt("tickerId", fTicksMeta.tickerId)
+        .setInt("barDeepSec", bws)
         .setDate("maxDdate",
           maxDdate match {
             case Some(lDate: LocalDate) => lDate
@@ -461,7 +470,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         * Last Tick only ddate
         */
       val ltDdate: Option[LocalDate] = (session.execute(bndLastTickDdate
-        .setInt("tickerId", rowCP.getInt("ticker_id"))
+        .setInt("tickerId", fTicksMeta.tickerId)
       ).all().iterator.asScala.toSeq map (row => row.getDate("ddate"))
         ).headOption
 
@@ -469,7 +478,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       match {
         case Some(ltd) => {
           (session.execute(bndLastTickTs
-            .setInt("tickerId", rowCP.getInt("ticker_id"))
+            .setInt("tickerId", fTicksMeta.tickerId)
             .setDate("pDdate", ltd)
           ).all().iterator.asScala.toSeq map (row => row.getLong("db_tsunx"))
             ).headOption
@@ -477,31 +486,14 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         case None => None
       }
 
-      /*
-      --removed 26.056.2019 for optimization purpose.
+      //val thisRowTickerID :Int = fTicksMeta.tickerId
 
-      def firstTickTS: Option[Long] =
-          session.execute(bndFirstTickDdate
-          .setInt("tickerId", rowCP.getInt("ticker_id")))
-          .all().iterator.asScala.toSeq map (row => row.getDate("ddate")) find (ld => ld != null)
-        match {
-          case Some(firstDdate) => {
-            (session.execute(bndFirstTickTs
-              .setInt("tickerId", rowCP.getInt("ticker_id"))
-              .setDate("pDdate", firstDdate)
-            ).all().iterator.asScala.toSeq map (row => row.getLong("db_tsunx"))
-              ).headOption
-          }
-          case None => None
-        }
-      */
-
-      val thisRowTickerID :Int = rowCP.getInt("ticker_id")
-
-       CalcProperty(
-         thisRowTickerID,
-         rowCP.getInt("bar_width_sec"),
-         rowCP.getInt("is_enabled"),
+    CalcProperties(
+       Seq(
+         CalcProperty(
+           fTicksMeta.tickerId,
+         bws,
+         1,
          lb match {
            case Some(bar) => Some(bar.tsEnd)
            case _ => None
@@ -510,20 +502,30 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
          ltTS,
          lb match {
            case Some(bar) => Some(bar.tsEnd)
-           case _ => fTicksMeta.find(_.tickerId == thisRowTickerID) match {
-             case Some(foundedFirstTicksMeta) => foundedFirstTicksMeta.firstTs
+           case _ => fTicksMeta.firstTs
+           /*
+           match {
+             case Some(foundedFirstTicksMeta) => foundedFirstTicksMeta
              case _ => None
            }
+           */
          }
-       )
-
-    }
-
-    CalcProperties(
-      bndBCalcPropsDataSet
-      .toSeq.map(rowToCalcProperty)
+       ))
     )
+
+    /*
+    fTicksMeta.firstDdate : Option[LocalDate]
+    fTicksMeta.firstTs    : Option[Long]
+    */
+
+    /*
+    CalcProperties(
+      bndBCalcPropsDataSet.toSeq.map(rowToCalcProperty)
+    )
+    */
   }
+  /** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
 
 
   val rowToSeqTicks = (rowT: Row, tickerID: Int) => {

@@ -3,7 +3,7 @@ package bcapp
 import java.io
 import java.io.File
 
-import bcpackage.BarCalculator
+import bcpackage.BarCalculatorTickersBws
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.LoggerFactory
 
@@ -42,10 +42,10 @@ object BarsCalcApp extends App {
   }
 
   val dbType: String = "cassandra"
-  val node: String = config.getString(dbType+".src.ip")//"10.0.0.13"
+  val node: String = config.getString(dbType+".src.ip")
   val readBySecs: Long = 60 * 60 * config.getInt(dbType+".readByHours")
   try {
-    (new BarCalculator(node, dbType, readBySecs)).run
+    (new BarCalculatorTickersBws(node, dbType, readBySecs)).run
   } catch {
     case ex: Throwable => ex.printStackTrace()
   }
