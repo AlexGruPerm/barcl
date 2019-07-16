@@ -1,3 +1,7 @@
+
+Seq(5,2,10).max
+
+/*
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Random, Success}
@@ -70,6 +74,7 @@ def infiniteLoop(): Seq[Future[Unit]] =
 
   Await.ready(Future.sequence(infiniteLoop), Duration.Inf)
 }
+*/
 
 
 
