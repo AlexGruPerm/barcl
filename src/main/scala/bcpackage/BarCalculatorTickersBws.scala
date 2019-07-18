@@ -24,59 +24,68 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
   val logger = LoggerFactory.getLogger(getClass.getName)
   logger.info("readBySecs="+readBySecs)
 
-  def logCalcProp(cp :CalcProperty) ={
-    logger.info("Calc property: -------------------------------------------------------------------------------------")
-    logger.info(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + " IS_ENABLED=["+cp.isEnabled+"]" + "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
-      cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick+ " cp FIRSTTICK="+cp.tsFirstTicks)
+  def logCalcProp(cp :CalcProperty) = {
+    if (cp.tickerId == 3 && cp.barDeepSec == 30) {
+      logger.info("Calc property: -------------------------------------------------------------------------------------")
+      logger.info(" TICKER_ID=" + cp.tickerId + " DEEPSEC=" + cp.barDeepSec + "] LASTBAR_TSEND=[" + cp.tsEndLastBar + "] LASTTICK_DDATE=" +
+        cp.dDateLastTick + " LASTTICK_TS=" + cp.tsLastTick + " cp FIRSTTICK=" + cp.tsFirstTicks)
 
-    logger.info(" First tick TS = "+cp.tsFirstTicks)
-    logger.info(" Interval from last bar TS and last tick TS  =    "+cp.diffLastTickTSBarTS+"   sec." + " AVERAGE = "+
-      Math.round(cp.diffLastTickTSBarTS/(60*60*24))+" days.")
+      logger.info(" First tick TS = " + cp.tsFirstTicks)
+      logger.info(" Interval from last bar TS and last tick TS  =    " + cp.diffLastTickTSBarTS + "   sec." + " AVERAGE = " +
+        Math.round(cp.diffLastTickTSBarTS / (60 * 60 * 24)) + " days.")
+    }
   }
 
   def intervalSecondsDouble(sqTicks :Seq[Tick]) :Double =
     (sqTicks.last.db_tsunx.toDouble - sqTicks.head.db_tsunx.toDouble) / 1000
 
   def calcIteration(dbInst :DBImpl,fTicksMeta :FirstTickMeta, bws :Int) :Int = {
-    logger.info("ITERATION FOR tickerId="+fTicksMeta.tickerId+" and BWS=["+bws+"]")
-    val allCalcProps :CalcProperties = dbInst.getAllCalcProperties(fTicksMeta,bws)
+    if (fTicksMeta.tickerId == 3 && bws == 30) logger.info("ITERATION FOR tickerId=" + fTicksMeta.tickerId + " and BWS=[" + bws + "]")
+    val allCalcProps: CalcProperties = dbInst.getAllCalcProperties(fTicksMeta, bws)
 
+    def readTicksRecurs(readFromTs: Long, readToTs: Long, cp: CalcProperty): seqTicksWithReadDuration = {
 
-    //todo: Make type definition and return this type instead of (seqTicksObj,Long)
-    def readTicksRecurs(readFromTs :Long, readToTs :Long, cp :CalcProperty) :seqTicksWithReadDuration = {
-      val (seqTicks, readMsec) = dbInst.getTicksByInterval(cp, readFromTs, readToTs)
-      //read from Friday last ticks and there is nth. to read and we have data in next days.
-      if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) > readToTs){
+      if (cp.tickerId == 3 && cp.barDeepSec == 30) {
+        logger.info(" ~~~~~ 3[30] INCOME INTO readTicksRecurs readFromTs=["+readFromTs+"] readToTs=["+readToTs+"] tsEndLastBar"+cp.tsEndLastBar.getOrElse(-1L)+" ~~~~~~~~~")
+      }
+
+      val (seqTicks, readMsec) = dbInst.getTicksByInterval(cp.tickerId, readFromTs, readToTs, cp.barDeepSec)
+      if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) > readToTs) {
+        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -11111- sqTicks.isEmpty then READ readFromTs=" + readFromTs + " readToTs=" + readToTs + readBySecs * 1000L)
         readTicksRecurs(readFromTs, readToTs + readBySecs * 1000L, cp)
       }
-      else if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) <= readToTs){
+      else if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) <= readToTs) {
+        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -22222- sqTicks.isEmpty RETRUN ALSO cp.tsLastTick.getOrElse(0L) <= readToTs")
         (seqTicks, readMsec)
       }
       else if (cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) < readToTs) {
+        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -33333- cp.tsLastTick.getOrElse(0L) between readFromTs and readToTs")
         (seqTicks, readMsec)
       }
       else if (seqTicks.sqTicks.nonEmpty && intervalSecondsDouble(seqTicks.sqTicks) < cp.barDeepSec.toDouble &&
         cp.tsLastTick.getOrElse(0L) > readToTs) {
-        readTicksRecurs(readFromTs, readToTs + readBySecs*1000L, cp)
+        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -44444- sqTicks.nonEmpty ")
+        readTicksRecurs(readFromTs, readToTs + readBySecs * 1000L, cp)
       }
       else {
+        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -55555- ELSE ")
         (seqTicks, readMsec)
       }
     }
 
-    //allCalcProps.cProps.foreach{cp =>
+    val cp = allCalcProps.cProps.head
+    logCalcProp(cp)
 
-      val cp = allCalcProps.cProps.head
-      logCalcProp(cp)
+    val currReadInterval: (Long, Long) = (cp.beginFrom,
+      Seq(cp.beginFrom + readBySecs * 1000L, cp.tsLastTick.getOrElse(cp.beginFrom)).min)
 
-      val currReadInterval :(Long,Long) = (cp.beginFrom,
-        Seq(cp.beginFrom+readBySecs*1000L, cp.tsLastTick.getOrElse(cp.beginFrom)).min)
-
-      //todo: rewrite on function with one line output
-      logger.info(" In this iteration will read interval (PLAN) FROM: "+ currReadInterval._1+
-        " ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) +")")
-      logger.info("                                      (PLAN)   TO: "+ currReadInterval._2+
-        " ("+ core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) +")")
+    //todo: rewrite on function with one line output
+    if (cp.tickerId == 3 && bws == 30) {
+    logger.info(" In this iteration will read interval (PLAN) FROM: " + currReadInterval._1 +
+      " (" + core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) + ")")
+    logger.info("                                      (PLAN)   TO: " + currReadInterval._2 +
+      " (" + core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) + ")")
+  }
 
       val (seqTicks,readMsec) :seqTicksWithReadDuration =
         try {
@@ -90,46 +99,11 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
             (seqTicksObj(Nil),0L)
         }
 
-      logger.info("readed recursively ticks SIZE="+seqTicks.sqTicks.size+" ticks WIDTH sec.="+
-        (seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx)/1000L)
+    if (cp.tickerId == 3 && bws == 30) {
+      logger.info("readed recursively ticks SIZE=" + seqTicks.sqTicks.size + " ticks WIDTH sec.=" +
+        (seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx) / 1000L)
+    }
 
-    /*
-      val sleepAfterThisIteration :Int =
-        if (seqTicks.sqTicks.nonEmpty /*&& (seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx)/1000L > cp.barDeepSec*/ ) {
-          val bars: Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec * 1000L)
-
-          logger.info("LAST ["+cp.tickerId+"] (FROM CALCULATED THIS ITERATION) BAR TS_END="+bars.last.ts_end+
-            " SUMMARY LAST TICK IN SRC ="+cp.tsLastTick.getOrElse(0L)+ " DIFF = "+
-            (cp.tsLastTick.getOrElse(0L)-bars.last.ts_end)/1000L
-          )
-          logger.info("!!!!  Seq ticks interval = "+(seqTicks.sqTicks.last.db_tsunx -
-            seqTicks.sqTicks.head.db_tsunx)/1000L+" seconds.")
-          logger.info("!!!!  cp.barDeepSec = "+cp.barDeepSec+" seconds.")
-
-          if (bars.nonEmpty &&
-              ((seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx)/1000L) >= cp.barDeepSec) {
-            dbInst.saveBars(bars)
-            logger.info("Saved ["+bars.size+"] bars.")
-
-            if (bars.last.ddateFromTick == seqTicks.sqTicks.last.dDate &&
-               (cp.tsLastTick.getOrElse(0L).toInt - bars.last.ts_end.toInt)/1000.toFloat < cp.barDeepSec
-               ) {
-               ((cp.barDeepSec-(cp.tsLastTick.getOrElse(0L) - bars.last.ts_end)/1000L)*1000L).toInt
-             } else {
-               0
-             }
-          }
-          else {
-            logger.info("bars is Empty no save")
-            0
-          }
-        }
-        else if (seqTicks.sqTicks.nonEmpty && (seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx)/1000L < cp.barDeepSec) {
-          logger.info("Sleep not enougth ticks. INTERVAL="+(cp.barDeepSec - (seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx)/1000L).toInt)
-          (cp.barDeepSec - (seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx)/1000L).toInt*1000 //because sec. ms.
-        }
-        else 0 //seqTicks.sqTicks IS EMPTY, not sleeping at all.
-    */
 
     /**
       * seqTicks.sqTicks - ticks read by last readTicksRecurs,
@@ -141,13 +115,13 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
     val sleepAfterThisIteration :Int =
       if (seqTicks.sqTicks.nonEmpty) {
         val bars: Seq[Bar] = dbInst.getCalculatedBars(cp.tickerId, seqTicks.sqTicks, cp.barDeepSec * 1000L)
-        logger.info(" DEBUG_1 bars.size="+bars.size)
+        //## logger.info(" DEBUG_1 bars.size="+bars.size)
         /**
           * At least one bar calculated and ready to save.
         */
         if (bars.nonEmpty) {
-          logger.info(" DEBUG_2 bars.nonEmpty")
-          logger.info("[" + bars.size + "] bars send into dbInst.saveBars(bars) ")
+          //## logger.info(" DEBUG_2 bars.nonEmpty")
+          if (cp.tickerId == 3 && bws == 30) logger.info("[" + bars.size + "] bars send into dbInst.saveBars(bars) ")
           dbInst.saveBars(bars)
           /**
             * Sleep or not
@@ -159,13 +133,13 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
           ) {
             val sleepInterval :Int = (bars.last.ts_end + cp.barDeepSec*1000L).toInt -
                                      (cp.tsLastTick.getOrElse(0L) - bars.last.ts_end).toInt
-            logger.info("WILL SLEEP sleepInterval = ["+sleepInterval+"] ms.")
+            if (cp.tickerId == 3 && bws == 30) logger.info("WILL SLEEP sleepInterval = ["+sleepInterval+"] ms.")
             Seq(sleepInterval,0).max
           } else {
            0
           }
         } else {
-          logger.info(" DEBUG_2 bars.isEmpty")
+          //## logger.info(" DEBUG_2 bars.isEmpty")
           /**
             * We read ticks (sqTicks.nonEmpty) but it's not enough to calculate at least one bar
             */
@@ -179,7 +153,7 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
               (bars.last.ts_end + cp.barDeepSec*1000L).toInt -
               (cp.tsLastTick.getOrElse(0L) - bars.last.ts_end).toInt
             */
-            logger.info(" DEBUG_3 WILL SLEEP sleepInterval = ["+sleepInterval+"] ms.")
+            //## logger.info(" DEBUG_3 WILL SLEEP sleepInterval = ["+sleepInterval+"] ms.")
             Seq(sleepInterval,0).max
 
           } else {
@@ -197,7 +171,7 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
         */
       }
 
-    logger.info("RETURN sleepAfterThisIteration="+sleepAfterThisIteration)
+    if (cp.tickerId == 3 && bws == 30) logger.info("RETURN sleepAfterThisIteration="+sleepAfterThisIteration)
     sleepAfterThisIteration
   }
 
@@ -209,10 +183,13 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
   def run = {
     val dbInst: DBImpl = new DBCass(nodeAddress, dbType)
     require(!dbInst.isClosed, s"Session to [$dbType] is closed.")
-    val fTicksMeta :Seq[FirstTickMeta] = dbInst.getFirstTicksMeta//.filter(t => Seq(1).contains(t.tickerId))
-    val parsProperties :Seq[BarCalcProperty] = dbInst.getAllBarsProperties
+    val barsProperties :Seq[BarCalcProperty] = dbInst.getAllBarsProperties
+    val fTicksMeta :Seq[FirstTickMeta] = dbInst.getFirstTicksMeta.filter(ftm => barsProperties.map(_.tickerId).contains(ftm.tickerId))
 
-    val countOfThread :Int = Seq((fTicksMeta.size * parsProperties.size + 3),1).max
+    logger.info("barsProperties.size="+barsProperties.size+" FROM - mts_meta.bars_property")
+    logger.info("fTicksMeta.size="+fTicksMeta.size)
+
+    val countOfThread :Int = Seq((fTicksMeta.size * barsProperties.size + 3),1).max
     logger.info("countOfThread="+countOfThread)
 
     implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(countOfThread))
@@ -220,14 +197,16 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
     def taskCalcBars(tm :FirstTickMeta, bws :Int): Future[Unit] =
       Future {
         blocking {
-          logger.info("BEGIN taskCalcBars FOR [" + tm.tickerId + "]")
+          if (tm.tickerId==3 && bws==30) logger.info("BEGIN taskCalcBars FOR [" + tm.tickerId + "]")
           val t1 = System.currentTimeMillis
           val sleepAfterThisIterationMs: Int = calcIteration(dbInst, tm, bws)
           val t2 = System.currentTimeMillis
-          logger.info("Duration of taskCalcBars.run() - " + (t2 - t1) + " msecs. FOR=" + tm.tickerId + " bws=" + bws)
-          logger.info("This THREAD will sleep [" + (sleepAfterThisIterationMs / 1000L) + "] seconds.")
+          if (tm.tickerId==3 && bws==30) logger.info("Duration of taskCalcBars.run() - " + (t2 - t1) + " msecs. FOR=" + tm.tickerId + " bws=" + bws)
+          if (tm.tickerId==3 && bws==30) logger.info("This THREAD will sleep [" + (sleepAfterThisIterationMs / 1000L) + "] seconds.")
+
           if (sleepAfterThisIterationMs != 0)
             Thread.sleep(sleepAfterThisIterationMs)
+
         }
       }(ec)
 
@@ -235,10 +214,10 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
 
     def infiniteLoop(): Seq[Future[Unit]] = {
       fTicksMeta.flatMap {
-        tm => logger.info(">>> " + tm)
-          parsProperties.filter(bp => bp.tickerId == tm.tickerId).sortBy(bp => bp.bws)(Ordering[Int]).reverse
+        tm => //logger.info(">>> fTicksMeta =" + tm)
+          barsProperties.filter(bp => bp.tickerId == tm.tickerId).sortBy(bp => bp.bws)(Ordering[Int]).reverse
             .map{
-              bp => logger.info("   >>> "+bp)
+              bp => logger.info("   >>> barsProperties = "+tm+" - "+bp)
               Future.sequence(List(loopCalcBars(tm, bp.bws))).map(_ => ())
             }
       }

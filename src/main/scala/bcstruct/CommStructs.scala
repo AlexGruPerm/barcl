@@ -14,7 +14,6 @@ case class BarCalcProperty(tickerId  :Int,
   */
 case class CalcProperty(tickerId      :Int,
                         barDeepSec    :Int,
-                        isEnabled     :Int,
                         //-----------------
                         tsEndLastBar  :Option[Long],
                         //-----------------

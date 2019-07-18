@@ -426,3 +426,15 @@ CREATE TABLE mts_bars.bars_bws_dates(
 	ddate         date,
 	PRIMARY KEY (ticker_id ,bar_width_sec)
 );
+
+--new version from 17.07.2019 for deep debug purpose.
+CREATE TABLE mts_bars.bars_bws_dates (
+	ticker_id int,
+	bar_width_sec int,
+	ddate date,
+	curr_ts bigint,
+	cnt int,
+	ts_end_max bigint,
+	ts_end_min bigint,
+	PRIMARY KEY (( ticker_id, bar_width_sec), ddate, curr_ts)
+) WITH CLUSTERING ORDER BY (ddate DESC, curr_ts DESC );

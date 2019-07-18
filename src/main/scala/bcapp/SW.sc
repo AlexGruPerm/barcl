@@ -1,5 +1,9 @@
 
-Seq(5,2,10).max
+val t :Seq[Int]=Seq(1,5)
+
+t.sorted(Ordering[Int]).reverse
+
+
 
 /*
 import scala.concurrent.duration.Duration

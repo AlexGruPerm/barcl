@@ -46,6 +46,10 @@ object BarsCalcApp extends App {
     * && <-- stops evaluating if the first operand evaluates to false since the result will be false
     */
 
+    /**
+      * val startWriteBatchTime = System.nanoTime
+      * nanoToMillis(System.nanoTime()-startWriteBatchTime)
+    */
   val dbType: String = "cassandra"
   val node: String = config.getString(dbType+".src.ip")
   val readBySecs: Long = 60 * 60 * config.getInt(dbType+".readByHours")

@@ -2,8 +2,8 @@ package db
 
 import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta, barsResToSaveDB, _}
 import com.datastax.driver.core
-import com.datastax.driver.core.exceptions.NoHostAvailableException
 import com.datastax.driver.core._
+import com.datastax.driver.core.exceptions.NoHostAvailableException
 //import com.madhukaraphatak.sizeof.SizeEstimator
 import org.slf4j.LoggerFactory
 
@@ -27,7 +27,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
 
   def getAllBarsProperties : Seq[BarCalcProperty]
   def getAllCalcProperties(fTicksMeta :FirstTickMeta,bws :Int) : CalcProperties
-  def getTicksByInterval(cp :CalcProperty, tsBegin :Long, tsEnd :Long) : (seqTicksObj,Long)
+  def getTicksByInterval(tickerId: Int, tsBegin :Long, tsEnd :Long,bws :Int) : (seqTicksObj,Long)
   def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
   def saveBars(seqBarsCalced :Seq[Bar])
   //For Bar range calculator
@@ -67,7 +67,12 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     require(supportedDb.contains(dbType), "Not supported database type.")
     logger.debug(s"getSession - Try open connection to $dbType.")
     try {
-      val sessInternal = Cluster.builder().addContactPoint(nodeAddress).build().connect()
+
+      val sessInternal = Cluster.builder()
+        .addContactPoint(nodeAddress)
+        .build()
+        .connect()
+
 
       val ClusterConfig = sessInternal.getCluster.getConfiguration
       ClusterConfig.getSocketOptions.setConnectTimeoutMillis(180000)
@@ -77,9 +82,16 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       val protocolVersion = sessInternal.getCluster.getConfiguration.getProtocolOptions.getProtocolVersion
 
       val poolingOptions = sessInternal.getCluster.getConfiguration.getPoolingOptions
+
       /*
-      poolingOptions.setMaxConnectionsPerHost(HostDistance.LOCAL, connectionsPerHost)
-      poolingOptions.setMaxConnectionsPerHost(HostDistance.REMOTE, connectionsPerHost)*/
+      //todo: new from 18.07.2019
+      poolingOptions.setMaxConnectionsPerHost(HostDistance.LOCAL, 500)
+      poolingOptions.setMaxConnectionsPerHost(HostDistance.REMOTE, 500)
+      poolingOptions.setMaxRequestsPerConnection(HostDistance.LOCAL, 500)
+      poolingOptions.setMaxRequestsPerConnection(HostDistance.REMOTE, 500)
+      poolingOptions.setNewConnectionThreshold(HostDistance.LOCAL,100)
+      poolingOptions.setNewConnectionThreshold(HostDistance.REMOTE,100)
+      */
 
 
       logger.debug(s"($getClass).getSession - Connection opened for [$dbType]. protocolVersion="+protocolVersion)
@@ -107,7 +119,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   def close() = session.close()
 
   //todo: debug - remove it -  where ticker_id=1 and bar_width_sec=30
-  val bndBCalcProps = session.prepare(""" select * from mts_meta.bars_property; """).bind()
+  val bndBCalcProps = session.prepare(""" select * from mts_meta.bars_property; """)
 
   /*
   val lastBarMaxDdate = session.prepare(
@@ -115,11 +127,11 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 */
   //optimization 26.06.2019
   val lastBarMaxDdate = session.prepare(
-    """ select ddate from mts_bars.bars_bws_dates where ticker_id=:tickerId and bar_width_sec=:barDeepSec; """).bind()
+    """ select max(ddate) as ddate from mts_bars.bars_bws_dates where ticker_id=:tickerId and bar_width_sec=:barDeepSec allow filtering; """)
 
 
   val bndLastBar = session.prepare(
-    """  select ts_end from mts_bars.bars where ticker_id=:tickerId and bar_width_sec=:barDeepSec and ddate=:maxDdate limit 1;  """).bind()//allow filtering;
+    """  select ts_end from mts_bars.bars where ticker_id=:tickerId and bar_width_sec=:barDeepSec and ddate=:maxDdate limit 1;  """)
 
 
   /**
@@ -127,7 +139,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * PRIMARY KEY (ticker_id, ddate)
     * ) WITH CLUSTERING ORDER BY ( ddate DESC )
     */
-  val bndLastTickDdate = session.prepare(""" select ddate from mts_src.ticks_count_days where ticker_id = :tickerId limit 1; """).bind()
+  val bndLastTickDdate = session.prepare(""" select ddate from mts_src.ticks_count_days where ticker_id = :tickerId limit 1; """)
 
 
   /**
@@ -135,24 +147,24 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * PRIMARY KEY (( ticker_id, ddate ), ts, db_tsunx)
     * ) WITH CLUSTERING ORDER BY ( ts DESC, db_tsunx DESC )
     */
-  val bndLastTickTs = session.prepare(""" select db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate limit 1 """).bind()
+  val bndLastTickTs = session.prepare(""" select db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate limit 1 """)
 
   /**
     * ddate of First tick
     */
-  val bndFirstTickDdate = session.prepare("""  select min(ddate) as ddate from mts_src.ticks_count_days where ticker_id = :tickerId; """).bind()
+  val bndFirstTickDdate = session.prepare("""  select min(ddate) as ddate from mts_src.ticks_count_days where ticker_id = :tickerId; """)
 
 
-  val bndTickers = session.prepare(""" select ticker_id from mts_meta.tickers; """).bind
+  val bndTickers = session.prepare(""" select ticker_id from mts_meta.tickers; """)
 
-  val bndFirstTicksDdateAll = session.prepare(""" select ticker_id, min(ddate) as ddate from mts_src.ticks_count_days group by ticker_id; """).bind()
+  val bndFirstTicksDdateAll = session.prepare(""" select ticker_id, min(ddate) as ddate from mts_src.ticks_count_days group by ticker_id; """)
 
   /**
     * ts of first tick.
     */
   //Optimized 26.06.2019 extremely values.
   //val bndFirstTickTs = session.prepare(""" select min(db_tsunx) as db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate """).bind()
-  val bndFirstTickTs = session.prepare(""" select db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate order by ts,db_tsunx limit 1 """).bind()
+  val bndFirstTickTs = session.prepare(""" select db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate order by ts,db_tsunx limit 1 """)
 
 
   val bndTicksByTsInterval = session.prepare(
@@ -161,9 +173,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
            where ticker_id = :tickerId and
                  ddate >= :pMinDate and
                  ddate <= :pMaxDate and
-                 db_tsunx >= :dbTsunxBegin and
-                 db_tsunx <= :dbTsunxEnd
-           allow filtering; """).setIdempotent(true).bind()
+                 db_tsunx >= :tsBegin and
+                 db_tsunx <= :tsEnd
+           allow filtering; """)
 
   val bndTicksByTsIntervalONEDate = session.prepare(
     """ select db_tsunx,ask,bid
@@ -172,10 +184,12 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                  ddate     = :pDate and
                  db_tsunx >= :dbTsunxBegin and
                  db_tsunx <= :dbTsunxEnd
-           allow filtering; """).setIdempotent(true).bind()
+           allow filtering; """)
 
 
-  val bndSaveBarDdatesMeta = session.prepare(" insert into mts_bars.bars_bws_dates(ticker_id,ddate,bar_width_sec) values(:tickerId,:pDdate,:bws); ").setIdempotent(true).bind()
+//  val bndSaveBarDdatesMeta = session.prepare(" insert into mts_bars.bars_bws_dates(ticker_id,ddate,bar_width_sec) values(:tickerId,:pDdate,:bws); ").bind()
+
+  val bndSaveBarDdatesMetaWide = session.prepare(" insert into mts_bars.bars_bws_dates(ticker_id,bar_width_sec,ddate,curr_ts,cnt,ts_end_min,ts_end_max) values(:tickerId,:bws,:pDdate,:currTs,:cnt,:tsEndMin,:tsEndMax); ")
 
   /**
     * Save one bar.
@@ -215,14 +229,14 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             :p_ticks_cnt,
             :p_disp,
             :p_log_co
-            ); """).setIdempotent(true).bind()
+            ); """)
 
   /*
   val bndBarsHistMeta = session.prepare(
     """ select distinct ticker_id,bar_width_sec,ddate from mts_bars.bars allow filtering; """).setIdempotent(true).bind()
 */
   val bndBarsHistMeta = session.prepare(
-    """ select ticker_id,bar_width_sec,ddate from mts_bars.bars_bws_dates; """).bind()//.setIdempotent(true)
+    """ select ticker_id,bar_width_sec,max(ddate) as ddate from mts_bars.bars_bws_dates group by ticker_id,bar_width_sec; """)
 
   //todo: may be more optimal will be remove ordering in app level from db. IN db data stored ordered by ts_end DESC.
   val bndBarsHistData = session.prepare(
@@ -231,7 +245,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
          where ticker_id     = :p_ticker_id and
                bar_width_sec = :p_bar_width_sec and
                ddate         = :p_ddate
-         order by ts_end; """).bind()//         allow filtering
+         order by ts_end; """)
 
   val bndSaveFa = session.prepare(
     """ insert into mts_bars.bars_fa(
@@ -258,15 +272,11 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
        :p_ddate_res,
        :p_c_res,
        :p_res_type
-       ) """).bind()
-  /*
-  val bndSaveFa =session.prepare(
-    """ insert into mts_bars.bars_fa(ticker_id,    ddate,    bar_width_sec,    ts_end,     prcnt,    res_type,    res )
-                                      values(:p_ticker_id, :p_ddate, :p_bar_width_sec, :p_ts_end, :p_prcnt, :p_res_type, :p_res) """)
-  */
+       ) """)
+
 
   val bndBarsFAMeta = session.prepare(
-    """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """).bind()
+    """ select distinct ticker_id,ddate,bar_width_sec from mts_bars.bars_fa; """)
 
   val bndBarsFormsMaxDdate = session.prepare(
     """ select max(ddate)  as ddate,
@@ -285,7 +295,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                                                       from mts_bars.bars_fa
                                                      where ticker_id     = :p_ticker_id and
                                                            bar_width_sec = :p_bar_width_sec
-                                                     allow filtering; """).bind()
+                                                     allow filtering; """)
 
   val bndBarsFaData = session.prepare(
     """ select
@@ -301,7 +311,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                 where ticker_id     = :p_ticker_id and
                       bar_width_sec = :p_bar_width_sec and
                       ddate         = :p_ddate
-                allow filtering; """).bind()
+                allow filtering; """)
 
 
   val bndBarsFaDataRestTsEnd = session.prepare(
@@ -319,7 +329,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                       bar_width_sec = :p_bar_width_sec and
                       ddate         = :p_ddate and
                       ts_end        > :p_ts_end
-                allow filtering; """).bind()
+                allow filtering; """)
 
 
   /**
@@ -333,7 +343,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                db_tsunx <= :p_ts_end and
                ddate <= :p_ddate
          allow filtering """
-  ).bind()
+  )
 
 
   val bndDdatesTicksByInter = session.prepare(
@@ -344,7 +354,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                  ddate <= :p_ddate_max and
                  ddate >= :p_ddate_min
         allow filtering
-    """).bind()
+    """)
 
   val bndAllTicksByDdate = session.prepare(
     """
@@ -352,7 +362,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         from mts_src.ticks
        where ticker_id = :p_ticker_id and
              ddate     = :p_ddate
-    """).bind()
+    """)
 
   val bndSaveForms = session.prepare(
     """
@@ -382,7 +392,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
 
   def getAllBarsProperties : Seq[BarCalcProperty] =
-    session.execute(bndBCalcProps).all().iterator.asScala.map(
+    session.execute(bndBCalcProps.bind()).all().iterator.asScala.map(
       row => BarCalcProperty(
         row.getInt("ticker_id"),
         row.getInt("bar_width_sec"),
@@ -393,7 +403,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
 
   def getFirstTs(tickerId :Int, thisDdate :LocalDate) :Long =
-    session.execute(bndFirstTickTs.setInt("tickerId",tickerId).setDate("pDdate",thisDdate))
+    session.execute(bndFirstTickTs.bind().setInt("tickerId",tickerId).setDate("pDdate",thisDdate))
       .one().getLong("db_tsunx")
 
 
@@ -401,11 +411,11 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   def getFirstTicksMeta : Seq[FirstTickMeta] ={
     require(!session.isClosed)
 
-    val tickersIds :Seq[Int] = session.execute(bndTickers)
-      .all().iterator.asScala.map(row => row.getInt("ticker_id")).toList
+    val tickersIds :Seq[Int] = session.execute(bndTickers.bind())
+      .all().iterator.asScala.map(row => row.getInt("ticker_id")).toList.sortBy(t => t)
 
-    val (tMeta :Seq[(Int,LocalDate,Long)]) =
-      session.execute(bndFirstTicksDdateAll)
+    val tMeta :Seq[(Int,LocalDate,Long)] =
+      session.execute(bndFirstTicksDdateAll.bind())
       .all().iterator.asScala
       .map(row => (row.getInt("ticker_id"),row.getDate("ddate")))
       .map(elm => (elm._1,elm._2,getFirstTs(elm._1,elm._2))).toSeq
@@ -413,8 +423,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     tickersIds.map(thisTickerId =>
       FirstTickMeta(
         thisTickerId,
-        tMeta.find(t => t._1 == thisTickerId).map(tf => tf._2),
-        tMeta.find(t => t._1 == thisTickerId).map(tf => tf._3)
+        tMeta.find(_._1 == thisTickerId).map(_._2),
+        tMeta.find(_._1 == thisTickerId).map(_._3)
      )
     )
 
@@ -428,48 +438,55 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * @return
     */
   def getAllCalcProperties(fTicksMeta :FirstTickMeta, bws :Int): CalcProperties = {
-    require(!session.isClosed)
+    //todo: ??? require(!session.isClosed)
 
-    /*
-    fTicksMeta.tickerId   : Int
-    fTicksMeta.firstDdate : Option[LocalDate]
-    fTicksMeta.firstTs    : Option[Long]
-    bws                   : Int
-    */
+      //Last bar max ddate
+      val maxDdate :Option[LocalDate] =
+        Option(session.execute(lastBarMaxDdate.bind()
+          .setInt("tickerId", fTicksMeta.tickerId)
+          .setInt("barDeepSec", bws)
+        ).one().getDate("ddate"))
 
-      /**
-        * Last bar max ddate
-        */
-      val maxDdate = session.execute(lastBarMaxDdate
-        .setInt("tickerId", fTicksMeta.tickerId)
-        .setInt("barDeepSec", bws)
-      ).all().iterator.asScala.toSeq.map(row => {
-        row.getDate("ddate")
-      }).headOption
+    if (fTicksMeta.tickerId==3 && bws==30)
+      logger.info(">>>>>>>>> ticker_id=3 bws=["+bws+"] INSIDE getAllCalcProperties maxDdate = "+maxDdate)
+
 
       /**
-        * Last Bar
+        * Last Bar bndLastBar =
+        *
+        * select ts_end from mts_bars.bars where ticker_id=:tickerId and bar_width_sec=:barDeepSec and ddate=:maxDdate limit 1;
+        *
         */
-      val lb: Option[LastBar] = (session.execute(bndLastBar
-        .setInt("tickerId", fTicksMeta.tickerId)
-        .setInt("barDeepSec", bws)
-        .setDate("maxDdate",
-          maxDdate match {
-            case Some(lDate: LocalDate) => lDate
-            case _ => core.LocalDate.fromMillisSinceEpoch(0)
-        })
-      ).all().iterator.asScala.toSeq map (row => {
-        LastBar(
-          row.getLong("ts_end")
-        )
-      })).headOption
 
-      logger.debug(">>>>>>>>>> lb.getOrElse(0L)=" + lb.getOrElse(0L))
+      val lb: Option[LastBar] = maxDdate
+      match {
+        case Some(thisMaxDate: LocalDate) => Option(
+          LastBar(session.execute(
+            bndLastBar.bind()
+              .setInt("tickerId", fTicksMeta.tickerId)
+              .setInt("barDeepSec", bws)
+              .setDate("maxDdate",thisMaxDate))
+            .one().getLong("ts_end")))
+        case None => None
+      }
+
+
+    //todo: rewrite it, if exists lDdate then exists ts-end, and we don't need use headOption HERE
+
+
+    if (fTicksMeta.tickerId==3 && bws==30) {
+      lb match {
+        case Some(b) =>logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>> INSIDE getAllCalcProperties lb = "+b+" ddate(lb)="+core.LocalDate.fromMillisSinceEpoch(b.tsEnd))
+        case None => logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>> INSIDE getAllCalcProperties  NOT FOUND LAST BASR lb =[] ddate(lb)=[]")
+      }
+
+
+    }
 
       /**
         * Last Tick only ddate
         */
-      val ltDdate: Option[LocalDate] = (session.execute(bndLastTickDdate
+      val ltDdate: Option[LocalDate] = (session.execute(bndLastTickDdate.bind()
         .setInt("tickerId", fTicksMeta.tickerId)
       ).all().iterator.asScala.toSeq map (row => row.getDate("ddate"))
         ).headOption
@@ -477,7 +494,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       val ltTS: Option[Long] = ltDdate
       match {
         case Some(ltd) => {
-          (session.execute(bndLastTickTs
+          (session.execute(bndLastTickTs.bind()
             .setInt("tickerId", fTicksMeta.tickerId)
             .setDate("pDdate", ltd)
           ).all().iterator.asScala.toSeq map (row => row.getLong("db_tsunx"))
@@ -486,43 +503,38 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         case None => None
       }
 
+
       //val thisRowTickerID :Int = fTicksMeta.tickerId
 
     CalcProperties(
        Seq(
          CalcProperty(
            fTicksMeta.tickerId,
-         bws,
-         1,
+           bws,
          lb match {
            case Some(bar) => Some(bar.tsEnd)
            case _ => None
          },
          ltDdate,
          ltTS,
-         lb match {
+         lb match { //maximal ts_end as a up range of calculated bars, if no bars then fTicksMeta.firstTs from ticks.
            case Some(bar) => Some(bar.tsEnd)
            case _ => fTicksMeta.firstTs
-           /*
-           match {
-             case Some(foundedFirstTicksMeta) => foundedFirstTicksMeta
-             case _ => None
-           }
-           */
          }
        ))
     )
+/**
+  * tickerId      :Int,
+  * barDeepSec    :Int,
+  * //-----------------
+  * tsEndLastBar  :Option[Long],
+  * //-----------------
+  * dDateLastTick :Option[LocalDate],
+  * tsLastTick    :Option[Long],
+  * //-----------------
+  * tsFirstTicks  :Option[Long]//todo: it's not necessary to read it on each iterations.
+*/
 
-    /*
-    fTicksMeta.firstDdate : Option[LocalDate]
-    fTicksMeta.firstTs    : Option[Long]
-    */
-
-    /*
-    CalcProperties(
-      bndBCalcPropsDataSet.toSeq.map(rowToCalcProperty)
-    )
-    */
   }
   /** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
@@ -594,7 +606,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     )
   }
 
-  val rowToTinyTick = (row: Row) => {
+  val rowToTinyTick : (Row => tinyTick) = (row: Row) => {
      tinyTick(
       row.getLong("db_tsunx"),
       row.getDouble("ask"),
@@ -606,37 +618,51 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     * Read and return seq of ticks for this ticker_id and interval by ts: tsBegin - tsEnd (unix timestamp)
     */
   //todo :opt#3 Maybe use 2 queries, when ddate_begin=ddate-end Use = in query, or >= and <=
-  def getTicksByInterval(cp: CalcProperty, tsBegin: Long, tsEnd: Long) = {
+  def getTicksByInterval(tickerId: Int, tsBegin: Long, tsEnd: Long,bws :Int) = {
     val t1 = System.currentTimeMillis
 
     val pDate :LocalDate = LocalDate.fromMillisSinceEpoch(tsBegin)
 
-    val sqt = if (LocalDate.fromMillisSinceEpoch(tsBegin) == LocalDate.fromMillisSinceEpoch(tsEnd)) {
-      //logger.info("  getTicksByInterval branch = 1 pDate="+pDate)
-      seqTicksObj(session.execute(bndTicksByTsIntervalONEDate
-        .setInt("tickerId", cp.tickerId)
+    if (tickerId==3 && bws==30){
+      logger.info("TICKER = 3 pDate = "+pDate)
+      logger.info("TICKER = 3 tsBegin = "+tsBegin+" LocalDate.fromMillisSinceEpoch(tsBegin) = "+LocalDate.fromMillisSinceEpoch(tsBegin))
+      logger.info("TICKER = 3 tsEnd   = "+tsEnd+" LocalDate.fromMillisSinceEpoch(tsEnd) = "+LocalDate.fromMillisSinceEpoch(tsEnd))
+      Thread.sleep(3000)
+    }
+
+    val sqt =
+      if (pDate == LocalDate.fromMillisSinceEpoch(tsEnd)) {
+      val res = seqTicksObj(session.execute(bndTicksByTsIntervalONEDate.bind
+        .setInt("tickerId", tickerId)
         .setDate("pDate", pDate)
         .setLong("dbTsunxBegin", tsBegin)
         .setLong("dbTsunxEnd", tsEnd)
-      ).all().iterator.asScala.toSeq.map(r => rowToSeqTicksWDate(r, cp.tickerId, pDate)).sortBy(t => t.db_tsunx))
+      ).all().iterator.asScala.toSeq.map(r => rowToSeqTicksWDate(r, tickerId, pDate)).sortBy(t => t.db_tsunx))
+        if (tickerId==3 && bws==30) logger.info("  getTicksByInterval branch = 1 res.SIZE = "+res.sqTicks.size)
+        res
     } else {
       //todo: replace here on read multiple times by distinct ddate and concatenate resulta with flatMap
-      //logger.info("  getTicksByInterval branch = 2 pMinDate="+LocalDate.fromMillisSinceEpoch(tsBegin)+" pMaxDate="+LocalDate.fromMillisSinceEpoch(tsEnd))
-      seqTicksObj(session.execute(bndTicksByTsInterval
-        .setInt("tickerId", cp.tickerId)
+      val res =
+      seqTicksObj(session.execute(bndTicksByTsInterval.bind
+        .setInt("tickerId", tickerId)
         .setDate("pMinDate", LocalDate.fromMillisSinceEpoch(tsBegin))
         .setDate("pMaxDate", LocalDate.fromMillisSinceEpoch(tsEnd))
-        .setLong("dbTsunxBegin", tsBegin)
-        .setLong("dbTsunxEnd", tsEnd)
-      ).all().iterator.asScala.toSeq.map(r => rowToSeqTicks(r, cp.tickerId)).sortBy(t => t.db_tsunx))
+        .setLong("tsBegin", tsBegin)
+        .setLong("tsEnd", tsEnd)
+      ).all().iterator.asScala.toSeq.map(r => rowToSeqTicks(r, tickerId)).sortBy(t => t.db_tsunx))
+        if (tickerId==3 && bws==30) {
+          logger.info("###############################################################")
+          logger.info("  getTicksByInterval read from=" + LocalDate.fromMillisSinceEpoch(tsBegin) + " to=" + LocalDate.fromMillisSinceEpoch(tsEnd) + " tsBegin = " + tsBegin +
+            " tsEnd =" + tsEnd +
+            " branch = 2 res.SIZE = " + res.sqTicks.size)
+          logger.info("###############################################################")
+        }
+        res
     }
 
 
-
-
-
     val t2 = System.currentTimeMillis
-    logger.debug("Inside getTicksByInterval. Read interval " + tsBegin + " - " + tsEnd + " diration=" + (t2 - t1) + " Ticks Size=" + sqt.sqTicks.size)
+    if (tickerId==3 && bws==30) logger.info("Inside getTicksByInterval. Read interval " + tsBegin + " - " + tsEnd + " diration=" + (t2 - t1) + " Ticks Size=" + sqt.sqTicks.size)
     (sqt, t2 - t1)
   }
 
@@ -673,11 +699,47 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   def saveBars(seqBarsCalced: Seq[Bar]) :Unit = {
     require(seqBarsCalced.nonEmpty, "Seq of Bars for saving is Empty.")
+    import java.time.Instant
+    val currUnixTimestamp : Long = Instant.now.toEpochMilli
 
+
+    val seqBarsParts = seqBarsCalced.grouped(300)
+    for(thisPartOfSeq  <- seqBarsParts) {
+      val batch = new BatchStatement(BatchStatement.Type.UNLOGGED)
+      thisPartOfSeq.foreach {
+        b =>
+          batch.add(bndSaveBar.bind
+            .setInt("p_ticker_id", b.ticker_id)
+            .setDate("p_ddate", b.ddateFromTick)
+            .setInt("p_bar_width_sec", b.bar_width_sec)
+            .setLong("p_ts_begin", b.ts_begin)
+            .setLong("p_ts_end", b.ts_end)
+            .setDouble("p_o", b.o)
+            .setDouble("p_h", b.h)
+            .setDouble("p_l", b.l)
+            .setDouble("p_c", b.c)
+            .setDouble("p_h_body", b.h_body)
+            .setDouble("p_h_shad", b.h_shad)
+            .setString("p_btype", b.btype)
+            .setInt("p_ticks_cnt", b.ticks_cnt)
+            .setDouble("p_disp", b.disp)
+            .setDouble("p_log_co", b.log_co))
+        }
+        //logger.info("saveBars  before execute batch.size()="+batch.size())
+       try {
+         session.execute(batch)
+       } catch {
+         case e : com.datastax.driver.core.exceptions.InvalidQueryException => logger.error(e.getMessage+" "+e.getCause)
+           throw e
+       }
+        batch.clear()
+      }
+
+    /*
     for (b <- seqBarsCalced) {
-      session.execute(bndSaveBar
+      session.execute(bndSaveBar.bind
         .setInt("p_ticker_id", b.ticker_id)
-        .setDate("p_ddate", b.ddateFromTick)//todo: replaced 10.07.2019 core.LocalDate.fromMillisSinceEpoch(b.ddate))
+        .setDate("p_ddate", b.ddateFromTick)
         .setInt("p_bar_width_sec", b.bar_width_sec)
         .setLong("p_ts_begin", b.ts_begin)
         .setLong("p_ts_end", b.ts_end)
@@ -692,22 +754,57 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         .setDouble("p_disp", b.disp)
         .setDouble("p_log_co", b.log_co))
     }
-
-    val (tickerId :Int, bws :Int, maxDdate :LocalDate) = (
-      seqBarsCalced.head.ticker_id,
-      seqBarsCalced.head.bar_width_sec,
-      seqBarsCalced.maxBy(_.ddateFromTick).ddateFromTick)
-    /**
-      *  replaced 10.07.2019
-      *  OLD CODE : core.LocalDate.fromMillisSinceEpoch(seqBarsCalced.maxBy(_.ddate).ddate))
-      *
     */
 
-    session.execute(bndSaveBarDdatesMeta
-      .setInt("tickerId",tickerId)
-      .setDate("pDdate",maxDdate)
-      .setInt("bws",bws)
-    )
+    seqBarsCalced
+      .map(bc => (bc.ticker_id,bc.bar_width_sec,bc.ddateFromTick))
+      .distinct
+      .sortBy(b => b._3.getDaysSinceEpoch)(Ordering[Int])
+      .map{tpl =>
+
+      if (tpl._1==3 && tpl._2==30) {
+        logger.info("           ")
+        logger.info(">>>>>>>>>>>>>>> tickerID="+tpl._1+" DDATE = "+tpl._3+" minTs = "+seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).head.ts_end+
+          " maxTsEnd = "+seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).last.ts_end
+        )
+        logger.info("           ")
+      }
+
+      session.execute(bndSaveBarDdatesMetaWide.bind()
+        .setInt("tickerId", tpl._1)
+        .setInt("bws", tpl._2)
+        .setDate("pDdate", tpl._3)
+        .setLong("currTs", currUnixTimestamp)
+        .setInt("cnt", seqBarsCalced.count(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3))
+        .setLong("tsEndMin", seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).head.ts_end)
+        .setLong("tsEndMax", seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).last.ts_end)
+      )
+    }
+
+
+    /*
+    BEFORE 18.07.2019
+    for (b <- seqBarsCalced) {
+      session.execute(bndSaveBar
+        .setInt("p_ticker_id", b.ticker_id)
+        .setDate("p_ddate", b.ddateFromTick)
+        .setInt("p_bar_width_sec", b.bar_width_sec)
+        .setLong("p_ts_begin", b.ts_begin)
+        .setLong("p_ts_end", b.ts_end)
+        .setDouble("p_o", b.o)
+        .setDouble("p_h", b.h)
+        .setDouble("p_l", b.l)
+        .setDouble("p_c", b.c)
+        .setDouble("p_h_body", b.h_body)
+        .setDouble("p_h_shad", b.h_shad)
+        .setString("p_btype", b.btype)
+        .setInt("p_ticks_cnt", b.ticks_cnt)
+        .setDouble("p_disp", b.disp)
+        .setDouble("p_log_co", b.log_co))
+    }
+*/
+
+
 
   }
 
@@ -720,15 +817,13 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
     */
   def getAllBarsHistMeta: Seq[barsMeta] = {
-    session.execute(bndBarsHistMeta).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r))
-      //.filter(r => Seq(20).contains(r.tickerId) /*&& Seq(30/*300,600,1800,3600*/).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!
+    session.execute(bndBarsHistMeta.bind()).all().iterator.asScala.toSeq.map(r => rowToBarMeta(r)).distinct
       .sortBy(sr => (sr.tickerId, sr.barWidthSec, sr.dDate))
-    //read here ts_end for each pairs:sr.tickerId,sr.barWidthSec for running Iterations in loop.
   }
 
 
   def getLastBarFaTSEnd(tickerID: Int, bar_width_sec: Int): Option[LocalDate] = {
-    Option(session.execute(bndBarsFaLastNN
+    Option(session.execute(bndBarsFaLastNN.bind()
       .setInt("p_ticker_id", tickerID)
       .setInt("p_bar_width_sec", bar_width_sec))
       .one().getDate("ddate"))
@@ -741,7 +836,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     *
     **/
   def getAllCalcedBars(seqB: Seq[barsMeta]): Seq[barsForFutAnalyze] = {
-    seqB.flatMap(sb => session.execute(bndBarsHistData
+    seqB.flatMap(sb => session.execute(bndBarsHistData.bind()
       .setInt("p_ticker_id", sb.tickerId)
       .setInt("p_bar_width_sec", sb.barWidthSec)
       .setDate("p_ddate", sb.dDate))
@@ -788,7 +883,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     */
   def saveBarsFutAnal(seqFA :Seq[barsResToSaveDB]) :Unit = {
      for(t <- seqFA) {
-       session.execute(bndSaveFa
+       session.execute(bndSaveFa.bind()
          .setInt("p_ticker_id", t.tickerId)
          .setDate("p_ddate", t.dDate)
          .setInt("p_bar_width_sec", t.barWidthSec)
@@ -830,7 +925,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /** ------------------------------------------------------- */
 
   def getAllBarsFAMeta : Seq[barsFaMeta] ={
-    session.execute(bndBarsFAMeta).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
+    session.execute(bndBarsFAMeta.bind()).all().iterator.asScala.toSeq.map(r => rowToBarFAMeta(r))
        //.filter(r =>  r.tickerId == 18 /*&& Seq(30).contains(r.barWidthSec)*/) //-------------------------------------------------------------- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       .sortBy(sr => (sr.tickerId,sr.barWidthSec,sr.dDate))
   }
@@ -879,7 +974,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     (minDdate,minTs) match {
       case (Some(minDdate),Some(tsEndBegin)) =>
         seqB.withFilter(b => b.dDate.getMillisSinceEpoch >= minDdate.getMillisSinceEpoch)
-          .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd
+          .flatMap(sb => session.execute(bndBarsFaDataRestTsEnd.bind()
             .setInt("p_ticker_id", sb.tickerId)
             .setInt("p_bar_width_sec", sb.barWidthSec)
             .setDate("p_ddate", sb.dDate)
@@ -887,7 +982,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             .all().iterator.asScala.toSeq.map(r => rowToBarFAData(r, sb.tickerId, sb.barWidthSec, sb.dDate))
             .sortBy(_.ts_end))
       case _ =>
-        seqB.flatMap(sb => session.execute(bndBarsFaData
+        seqB.flatMap(sb => session.execute(bndBarsFaData.bind()
           .setInt("p_ticker_id", sb.tickerId)
           .setInt("p_bar_width_sec", sb.barWidthSec)
           .setDate("p_ddate", sb.dDate))
@@ -942,7 +1037,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   */
   // !!! remove it as useless !!!
   def getTicksForForm(tickerID :Int, tsBegin :Long, tsEnd :Long, ddateEnd : LocalDate) :Seq[tinyTick] = {
-    session.execute(bndTinyTicks
+    session.execute(bndTinyTicks.bind()
       .setInt("p_ticker_id", tickerID)
       .setLong("p_ts_begin",tsBegin)
       .setLong("p_ts_end",tsEnd)
@@ -966,7 +1061,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
     logger.debug("1. INTERNAL READ TICKS (" + (tickerID) + ") (ddateMin,ddateMax) = ( "+ddateMin+" , "+ddateMax+" )   (tsMin,tsMax) = ( "+tsMin+" , "+tsMax+" )")
 
-    session.execute(bndDdatesTicksByInter
+    session.execute(bndDdatesTicksByInter.bind()
         .setInt( "p_ticker_id",tickerID)
         .setDate("p_ddate_max",ddateMax)
         .setDate("p_ddate_min",ddateMin))
@@ -976,7 +1071,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .collect {
       case (tickerID :Int, ddate :LocalDate) =>
           val seqTickOneDDate :Seq[tinyTick] =
-            session.execute(bndAllTicksByDdate
+            session.execute(bndAllTicksByDdate.bind()
               .setInt("p_ticker_id",tickerID)
               .setDate("p_ddate",ddate))
               .all().iterator.asScala.toSeq
