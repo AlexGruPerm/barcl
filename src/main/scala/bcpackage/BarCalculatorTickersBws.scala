@@ -40,35 +40,42 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
     (sqTicks.last.db_tsunx.toDouble - sqTicks.head.db_tsunx.toDouble) / 1000
 
   def calcIteration(dbInst :DBImpl,fTicksMeta :FirstTickMeta, bws :Int) :Int = {
-    if (fTicksMeta.tickerId == 3 && bws == 30) logger.info("ITERATION FOR tickerId=" + fTicksMeta.tickerId + " and BWS=[" + bws + "]")
+    //if (fTicksMeta.tickerId == 3 && bws == 30)
+      logger.info("ITERATION FOR tickerId=" + fTicksMeta.tickerId + " and BWS=[" + bws + "]")
     val allCalcProps: CalcProperties = dbInst.getAllCalcProperties(fTicksMeta, bws)
 
     def readTicksRecurs(readFromTs: Long, readToTs: Long, cp: CalcProperty): seqTicksWithReadDuration = {
-
+/*
       if (cp.tickerId == 3 && cp.barDeepSec == 30) {
         logger.info(" ~~~~~ 3[30] INCOME INTO readTicksRecurs readFromTs=["+readFromTs+"] readToTs=["+readToTs+"] tsEndLastBar"+cp.tsEndLastBar.getOrElse(-1L)+" ~~~~~~~~~")
       }
+      */
 
       val (seqTicks, readMsec) = dbInst.getTicksByInterval(cp.tickerId, readFromTs, readToTs, cp.barDeepSec)
       if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) > readToTs) {
-        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -11111- sqTicks.isEmpty then READ readFromTs=" + readFromTs + " readToTs=" + readToTs + readBySecs * 1000L)
+        //if (cp.tickerId == 3 && cp.barDeepSec == 30)
+          logger.info(" readTicksRecurs -11111- sqTicks.isEmpty then READ readFromTs=" + readFromTs + " readToTs=" + readToTs + readBySecs * 1000L)
         readTicksRecurs(readFromTs, readToTs + readBySecs * 1000L, cp)
       }
       else if (seqTicks.sqTicks.isEmpty && cp.tsLastTick.getOrElse(0L) <= readToTs) {
-        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -22222- sqTicks.isEmpty RETRUN ALSO cp.tsLastTick.getOrElse(0L) <= readToTs")
+        //if (cp.tickerId == 3 && cp.barDeepSec == 30)
+          logger.info(" readTicksRecurs -22222- sqTicks.isEmpty RETRUN ALSO cp.tsLastTick.getOrElse(0L) <= readToTs")
         (seqTicks, readMsec)
       }
       else if (cp.tsLastTick.getOrElse(0L) > readFromTs && cp.tsLastTick.getOrElse(0L) < readToTs) {
-        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -33333- cp.tsLastTick.getOrElse(0L) between readFromTs and readToTs")
+        //if (cp.tickerId == 3 && cp.barDeepSec == 30)
+          logger.info(" readTicksRecurs -33333- cp.tsLastTick.getOrElse(0L) between readFromTs and readToTs")
         (seqTicks, readMsec)
       }
       else if (seqTicks.sqTicks.nonEmpty && intervalSecondsDouble(seqTicks.sqTicks) < cp.barDeepSec.toDouble &&
         cp.tsLastTick.getOrElse(0L) > readToTs) {
-        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -44444- sqTicks.nonEmpty ")
+        //if (cp.tickerId == 3 && cp.barDeepSec == 30)
+          logger.info(" readTicksRecurs -44444- sqTicks.nonEmpty ")
         readTicksRecurs(readFromTs, readToTs + readBySecs * 1000L, cp)
       }
       else {
-        if (cp.tickerId == 3 && cp.barDeepSec == 30) logger.info(" readTicksRecurs -55555- ELSE ")
+       // if (cp.tickerId == 3 && cp.barDeepSec == 30)
+          logger.info(" readTicksRecurs -55555- ELSE ")
         (seqTicks, readMsec)
       }
     }
@@ -80,12 +87,12 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
       Seq(cp.beginFrom + readBySecs * 1000L, cp.tsLastTick.getOrElse(cp.beginFrom)).min)
 
     //todo: rewrite on function with one line output
-    if (cp.tickerId == 3 && bws == 30) {
+    //if (cp.tickerId == 3 && bws == 30) {
     logger.info(" In this iteration will read interval (PLAN) FROM: " + currReadInterval._1 +
       " (" + core.LocalDate.fromMillisSinceEpoch(currReadInterval._1) + ")")
     logger.info("                                      (PLAN)   TO: " + currReadInterval._2 +
       " (" + core.LocalDate.fromMillisSinceEpoch(currReadInterval._2) + ")")
-  }
+  //}
 
       val (seqTicks,readMsec) :seqTicksWithReadDuration =
         try {
@@ -99,10 +106,10 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
             (seqTicksObj(Nil),0L)
         }
 
-    if (cp.tickerId == 3 && bws == 30) {
+    //if (cp.tickerId == 3 && bws == 30) {
       logger.info("readed recursively ticks SIZE=" + seqTicks.sqTicks.size + " ticks WIDTH sec.=" +
         (seqTicks.sqTicks.last.db_tsunx - seqTicks.sqTicks.head.db_tsunx) / 1000L)
-    }
+   // }
 
 
     /**
@@ -121,7 +128,8 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
         */
         if (bars.nonEmpty) {
           //## logger.info(" DEBUG_2 bars.nonEmpty")
-          if (cp.tickerId == 3 && bws == 30) logger.info("[" + bars.size + "] bars send into dbInst.saveBars(bars) ")
+          //if (cp.tickerId == 3 && bws == 30)
+            logger.info("[" + bars.size + "] bars send into dbInst.saveBars(bars) ")
           dbInst.saveBars(bars)
           /**
             * Sleep or not
@@ -171,7 +179,8 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
         */
       }
 
-    if (cp.tickerId == 3 && bws == 30) logger.info("RETURN sleepAfterThisIteration="+sleepAfterThisIteration)
+    //if (cp.tickerId == 3 && bws == 30)
+      logger.info("RETURN sleepAfterThisIteration="+sleepAfterThisIteration)
     sleepAfterThisIteration
   }
 
@@ -197,12 +206,15 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
     def taskCalcBars(tm :FirstTickMeta, bws :Int): Future[Unit] =
       Future {
         blocking {
-          if (tm.tickerId==3 && bws==30) logger.info("BEGIN taskCalcBars FOR [" + tm.tickerId + "]")
+          //if (tm.tickerId==3 && bws==30)
+            logger.info("BEGIN taskCalcBars FOR [" + tm.tickerId + "]")
           val t1 = System.currentTimeMillis
           val sleepAfterThisIterationMs: Int = calcIteration(dbInst, tm, bws)
           val t2 = System.currentTimeMillis
-          if (tm.tickerId==3 && bws==30) logger.info("Duration of taskCalcBars.run() - " + (t2 - t1) + " msecs. FOR=" + tm.tickerId + " bws=" + bws)
-          if (tm.tickerId==3 && bws==30) logger.info("This THREAD will sleep [" + (sleepAfterThisIterationMs / 1000L) + "] seconds.")
+         // if (tm.tickerId==3 && bws==30)
+            logger.info("Duration of taskCalcBars.run() - " + (t2 - t1) + " msecs. FOR=" + tm.tickerId + " bws=" + bws)
+         // if (tm.tickerId==3 && bws==30)
+            logger.info("This THREAD will sleep [" + (sleepAfterThisIterationMs / 1000L) + "] seconds.")
 
           if (sleepAfterThisIterationMs != 0)
             Thread.sleep(sleepAfterThisIterationMs)

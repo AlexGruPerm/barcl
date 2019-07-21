@@ -762,13 +762,13 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .sortBy(b => b._3.getDaysSinceEpoch)(Ordering[Int])
       .map{tpl =>
 
-      if (tpl._1==3 && tpl._2==30) {
+      //if (tpl._1==3 && tpl._2==30) {
         logger.info("           ")
         logger.info(">>>>>>>>>>>>>>> tickerID="+tpl._1+" DDATE = "+tpl._3+" minTs = "+seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).head.ts_end+
           " maxTsEnd = "+seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).last.ts_end
         )
         logger.info("           ")
-      }
+      //}
 
       session.execute(bndSaveBarDdatesMetaWide.bind()
         .setInt("tickerId", tpl._1)
