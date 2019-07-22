@@ -1,7 +1,6 @@
 package db
 
 import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta, barsResToSaveDB, _}
-import com.datastax.driver.core
 import com.datastax.driver.core._
 import com.datastax.driver.core.exceptions.NoHostAvailableException
 //import com.madhukaraphatak.sizeof.SizeEstimator
@@ -166,7 +165,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   //val bndFirstTickTs = session.prepare(""" select min(db_tsunx) as db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate """).bind()
   val bndFirstTickTs = session.prepare(""" select db_tsunx from mts_src.ticks where ticker_id = :tickerId and ddate= :pDdate order by ts,db_tsunx limit 1 """)
 
-
+  /*
   val bndTicksByTsInterval = session.prepare(
     """ select ddate,db_tsunx,ask,bid
             from mts_src.ticks
@@ -176,6 +175,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                  db_tsunx >= :tsBegin and
                  db_tsunx <= :tsEnd
            allow filtering; """)
+  */
 
   val bndTicksByTsIntervalONEDate = session.prepare(
     """ select db_tsunx,ask,bid
@@ -184,6 +184,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
                  ddate     = :pDate and
                  db_tsunx >= :dbTsunxBegin and
                  db_tsunx <= :dbTsunxEnd
+           order by  ts ASC, db_tsunx ASC
            allow filtering; """)
 
 
@@ -447,9 +448,10 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
           .setInt("barDeepSec", bws)
         ).one().getDate("ddate"))
 
+    /*
     if (fTicksMeta.tickerId==3 && bws==30)
       logger.info(">>>>>>>>> ticker_id=3 bws=["+bws+"] INSIDE getAllCalcProperties maxDdate = "+maxDdate)
-
+    */
 
       /**
         * Last Bar bndLastBar =
@@ -472,16 +474,14 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
 
     //todo: rewrite it, if exists lDdate then exists ts-end, and we don't need use headOption HERE
-
-
+    /*
     if (fTicksMeta.tickerId==3 && bws==30) {
       lb match {
         case Some(b) =>logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>> INSIDE getAllCalcProperties lb = "+b+" ddate(lb)="+core.LocalDate.fromMillisSinceEpoch(b.tsEnd))
         case None => logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>> INSIDE getAllCalcProperties  NOT FOUND LAST BASR lb =[] ddate(lb)=[]")
       }
-
-
     }
+    */
 
       /**
         * Last Tick only ddate
@@ -539,7 +539,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 
-
+  /*
   val rowToSeqTicks = (rowT: Row, tickerID: Int) => {
      Tick(
       tickerID,
@@ -549,6 +549,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       rowT.getDouble("bid")
     )
   }
+  */
 
   val rowToSeqTicksWDate = (rowT: Row, tickerID: Int, pDate :LocalDate) => {
     Tick(
@@ -617,19 +618,30 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * Read and return seq of ticks for this ticker_id and interval by ts: tsBegin - tsEnd (unix timestamp)
     */
-  //todo :opt#3 Maybe use 2 queries, when ddate_begin=ddate-end Use = in query, or >= and <=
-  def getTicksByInterval(tickerId: Int, tsBegin: Long, tsEnd: Long,bws :Int) = {
+  def getTicksByInterval(tickerId: Int, tsBegin: Long, tsEnd: Long, bws :Int) :(seqTicksObj,Long) = {
     val t1 = System.currentTimeMillis
+    (seqTicksObj(
+      (LocalDate.fromMillisSinceEpoch(tsBegin).getDaysSinceEpoch to
+        LocalDate.fromMillisSinceEpoch(tsEnd).getDaysSinceEpoch).flatMap {
+        dayNum =>
+          val d: LocalDate = LocalDate.fromDaysSinceEpoch(dayNum)
+          session.execute(bndTicksByTsIntervalONEDate.bind
+            .setInt("tickerId", tickerId)
+            .setDate("pDate", d)
+            .setLong("dbTsunxBegin", tsBegin)
+            .setLong("dbTsunxEnd", tsEnd))
+            .all().iterator.asScala.toSeq.map(r => rowToSeqTicksWDate(r, tickerId, d))
+      }
+    ), System.currentTimeMillis - t1)
+  }
 
+
+  //todo :opt#3 Maybe use 2 queries, when ddate_begin=ddate-end Use = in query, or >= and <=
+  /*
+  def getTicksByInterval(tickerId: Int, tsBegin: Long, tsEnd: Long,bws :Int) = {
+    OLD refactored code. 22.07.2019
+    val t1 = System.currentTimeMillis
     val pDate :LocalDate = LocalDate.fromMillisSinceEpoch(tsBegin)
-
-    if (tickerId==3 && bws==30){
-      logger.info("TICKER = 3 pDate = "+pDate)
-      logger.info("TICKER = 3 tsBegin = "+tsBegin+" LocalDate.fromMillisSinceEpoch(tsBegin) = "+LocalDate.fromMillisSinceEpoch(tsBegin))
-      logger.info("TICKER = 3 tsEnd   = "+tsEnd+" LocalDate.fromMillisSinceEpoch(tsEnd) = "+LocalDate.fromMillisSinceEpoch(tsEnd))
-      Thread.sleep(3000)
-    }
-
     val sqt =
       if (pDate == LocalDate.fromMillisSinceEpoch(tsEnd)) {
       val res = seqTicksObj(session.execute(bndTicksByTsIntervalONEDate.bind
@@ -638,7 +650,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         .setLong("dbTsunxBegin", tsBegin)
         .setLong("dbTsunxEnd", tsEnd)
       ).all().iterator.asScala.toSeq.map(r => rowToSeqTicksWDate(r, tickerId, pDate)).sortBy(t => t.db_tsunx))
-        if (tickerId==3 && bws==30) logger.info("  getTicksByInterval branch = 1 res.SIZE = "+res.sqTicks.size)
+        //if (tickerId==3 && bws==30) logger.info("  getTicksByInterval branch = 1 res.SIZE = "+res.sqTicks.size)
         res
     } else {
       //todo: replace here on read multiple times by distinct ddate and concatenate resulta with flatMap
@@ -650,21 +662,14 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
         .setLong("tsBegin", tsBegin)
         .setLong("tsEnd", tsEnd)
       ).all().iterator.asScala.toSeq.map(r => rowToSeqTicks(r, tickerId)).sortBy(t => t.db_tsunx))
-        if (tickerId==3 && bws==30) {
-          logger.info("###############################################################")
-          logger.info("  getTicksByInterval read from=" + LocalDate.fromMillisSinceEpoch(tsBegin) + " to=" + LocalDate.fromMillisSinceEpoch(tsEnd) + " tsBegin = " + tsBegin +
-            " tsEnd =" + tsEnd +
-            " branch = 2 res.SIZE = " + res.sqTicks.size)
-          logger.info("###############################################################")
-        }
         res
     }
-
-
     val t2 = System.currentTimeMillis
     if (tickerId==3 && bws==30) logger.info("Inside getTicksByInterval. Read interval " + tsBegin + " - " + tsEnd + " diration=" + (t2 - t1) + " Ticks Size=" + sqt.sqTicks.size)
     (sqt, t2 - t1)
-  }
+    }
+    */
+
 
 
   /*
@@ -762,13 +767,13 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       .sortBy(b => b._3.getDaysSinceEpoch)(Ordering[Int])
       .map{tpl =>
 
-      //if (tpl._1==3 && tpl._2==30) {
+/*
         logger.info("           ")
         logger.info(">>>>>>>>>>>>>>> tickerID="+tpl._1+" DDATE = "+tpl._3+" minTs = "+seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).head.ts_end+
           " maxTsEnd = "+seqBarsCalced.filter(p => p.ticker_id == tpl._1 && p.bar_width_sec == tpl._2 && p.ddateFromTick == tpl._3).last.ts_end
         )
         logger.info("           ")
-      //}
+        */
 
       session.execute(bndSaveBarDdatesMetaWide.bind()
         .setInt("tickerId", tpl._1)

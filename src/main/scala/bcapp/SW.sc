@@ -3,8 +3,6 @@ val t :Seq[Int]=Seq(1,5)
 
 t.sorted(Ordering[Int]).reverse
 
-
-
 /*
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}

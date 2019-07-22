@@ -158,12 +158,18 @@ CREATE TABLE mts_bars.bars_forms(
 --
 ---------------------------------------------------
 
+
+truncate mts_meta.bars_property;
+
+select * from mts_meta.bars_property;
+
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,30,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,60,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,300,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,600,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,1800,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,3600,1);
+
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (2,30,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (2,60,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (2,300,1);
@@ -326,60 +332,60 @@ INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (28,600,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (28,1800,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (28,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,3600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,30,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,60,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,300,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,600,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,1800,1);
-INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,3600,1)
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (30,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (31,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (32,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (33,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (34,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (35,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (36,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (37,3600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,30,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,60,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,300,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,600,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,1800,0);
+INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (38,3600,0);
 
 
 
