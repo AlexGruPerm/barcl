@@ -131,9 +131,9 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
             logger.info("(b - a)="+(b - a))
             */
             val sleepInterval :Int = (((bars.last.ts_end + cp.barDeepSec*1000L) - cp.tsLastTick.getOrElse(0L))/1000L).toInt
-            Seq(sleepInterval,1).max
+            Seq(sleepInterval,1000).max
           } else
-           0
+           3000 //todo: 3 msec. !!!
         } else {
           logger.info("Bars.IsEmpty")
           /**
@@ -144,12 +144,12 @@ class BarCalculatorTickersBws(nodeAddress :String, dbType :String, readBySecs :L
                 cp.dDateLastTick.getOrElse(0L) == seqTicks.sqTicks.last.dDate //total last tick ddate = this Rea last ticks ddate
           ){
             val sleepInterval :Int = cp.barDeepSec*1000 - (seqTicks.sqTicks.last.db_tsunx - cp.tsEndLastBar.getOrElse(0L)).toInt
-            Seq(sleepInterval,0).max
+            Seq(sleepInterval,3).max //todo: fix it and check this branch of code.
           } else
-            0
+            3000//todo: 3 msec. !!!
         }
       } else
-        0
+        3000//todo: 3 msec. !!!
     sleepAfterThisIteration
   }
 
