@@ -3,13 +3,12 @@ package db
 import bcstruct.{barsForFutAnalyze, barsFutAnalyzeRes, barsMeta, barsResToSaveDB, _}
 import com.datastax.driver.core._
 import com.datastax.driver.core.exceptions.NoHostAvailableException
+import com.datastax.driver.core.policies.ExponentialReconnectionPolicy
 //import com.madhukaraphatak.sizeof.SizeEstimator
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
-
-
 
 
 /**
@@ -23,10 +22,12 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def close()
 
   def getFirstTicksMeta : Seq[FirstTickMeta]
+  def checkConnectCount(tickerID :Int, bws :Int) :Unit
 
   def getAllBarsProperties : Seq[BarCalcProperty]
   def getAllCalcProperties(fTicksMeta :FirstTickMeta,bws :Int) : CalcProperties
-  def getTicksByInterval(tickerId: Int, tsBegin :Long, tsEnd :Long,bws :Int) : (seqTicksObj,Long)
+  def getTicksByIntervalShort(tickerId: Int, tsBegin :Long, tsEnd :Long,bws :Int) : (seqTicksObj,Long)
+  def getTicksByIntervalLong(tickerId: Int, tsBegin :Long, tsEnd :Long,bws :Int) : (seqTicksObj,Long)
   def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
   def saveBars(seqBarsCalced :Seq[Bar])
   //For Bar range calculator
@@ -67,7 +68,8 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
     logger.debug(s"getSession - Try open connection to $dbType.")
     try {
 
-      val sessInternal = Cluster.builder()
+      val sessInternal = Cluster.builder()                        //1 seconds -> 1 minute.
+        .withReconnectionPolicy(new ExponentialReconnectionPolicy(1000, 1 * 60 * 1000))//(new ConstantReconnectionPolicy(1000))
         .addContactPoint(nodeAddress)
         .build()
         .connect()
@@ -82,8 +84,9 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
       val poolingOptions = sessInternal.getCluster.getConfiguration.getPoolingOptions
 
-      /*
+
       //todo: new from 18.07.2019
+      /*
       poolingOptions.setMaxConnectionsPerHost(HostDistance.LOCAL, 500)
       poolingOptions.setMaxConnectionsPerHost(HostDistance.REMOTE, 500)
       poolingOptions.setMaxRequestsPerConnection(HostDistance.LOCAL, 500)
@@ -92,13 +95,17 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       poolingOptions.setNewConnectionThreshold(HostDistance.REMOTE,100)
       */
 
+      logger.info(s"($getClass).getSession - Connection opened for [$dbType]. protocolVersion="+protocolVersion)
 
-      logger.debug(s"($getClass).getSession - Connection opened for [$dbType]. protocolVersion="+protocolVersion)
+      logger.info("CoreConnectionsPerHost(REMOTE) = "+poolingOptions.getCoreConnectionsPerHost(HostDistance.REMOTE))
+      logger.info("HeartbeatIntervalSeconds = "+poolingOptions.getHeartbeatIntervalSeconds)
+      logger.info("IdleTimeoutSeconds = "+poolingOptions.getIdleTimeoutSeconds)
 
-      logger.debug("CoreConnectionsPerHost(REMOTE) = "+poolingOptions.getCoreConnectionsPerHost(HostDistance.REMOTE))
-      logger.debug("HeartbeatIntervalSeconds = "+poolingOptions.getHeartbeatIntervalSeconds)
-      logger.debug("IdleTimeoutSeconds = "+poolingOptions.getIdleTimeoutSeconds)
-
+      val state = sessInternal.getState()
+      state.getConnectedHosts.forEach{ch =>
+        val connections :Int = state.getOpenConnections(ch)
+        logger.info("For host "+ch+" there is "+connections+" opened connections.")
+      }
 
       Success(sessInternal)
     } catch {
@@ -111,6 +118,14 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
 
   val session = TrySession match {
     case Success(s) => s
+  }
+
+  def checkConnectCount(tickerID :Int, bws :Int) :Unit ={
+    val state = session.getState()
+    state.getConnectedHosts.forEach{ch =>
+      val connections :Int = state.getOpenConnections(ch)
+      logger.info("For host "+ch+" there is "+connections+" opened connections. For ["+tickerID+"]["+bws+"]")
+    }
   }
 
   def isClosed: Boolean = session.isClosed
@@ -177,6 +192,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
            allow filtering; """)
   */
 
+
   val bndTicksByTsIntervalONEDate = session.prepare(
     """ select db_tsunx,ask,bid
             from mts_src.ticks
@@ -187,6 +203,11 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
            order by  ts ASC, db_tsunx ASC
            allow filtering; """)
 
+  val bndTicksByTsIntervalONEDateV3 = session.prepare(
+    """ select db_tsunx,ask,bid
+                from mts_src.ticks
+               where ticker_id = :tickerId and
+                     ddate     = :pDate """)
 
 //  val bndSaveBarDdatesMeta = session.prepare(" insert into mts_bars.bars_bws_dates(ticker_id,ddate,bar_width_sec) values(:tickerId,:pDdate,:bws); ").bind()
 
@@ -618,7 +639,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * Read and return seq of ticks for this ticker_id and interval by ts: tsBegin - tsEnd (unix timestamp)
     */
-  def getTicksByInterval(tickerId: Int, tsBegin: Long, tsEnd: Long, bws :Int) :(seqTicksObj,Long) = {
+  def getTicksByIntervalShort(tickerId: Int, tsBegin: Long, tsEnd: Long, bws :Int) :(seqTicksObj,Long) = {
     val t1 = System.currentTimeMillis
     (seqTicksObj(
       (LocalDate.fromMillisSinceEpoch(tsBegin).getDaysSinceEpoch to
@@ -631,6 +652,27 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
             .setLong("dbTsunxBegin", tsBegin)
             .setLong("dbTsunxEnd", tsEnd))
             .all().iterator.asScala.toSeq.map(r => rowToSeqTicksWDate(r, tickerId, d))
+      }
+    ), System.currentTimeMillis - t1)
+  }
+
+  /**
+    * Read while partitons and filter, order in application level.
+*/
+  def getTicksByIntervalLong(tickerId: Int, tsBegin: Long, tsEnd: Long, bws :Int) :(seqTicksObj,Long) = {
+    val t1 = System.currentTimeMillis
+    (seqTicksObj(
+      (LocalDate.fromMillisSinceEpoch(tsBegin).getDaysSinceEpoch to
+        LocalDate.fromMillisSinceEpoch(tsEnd).getDaysSinceEpoch).flatMap {
+        dayNum =>
+          val d: LocalDate = LocalDate.fromDaysSinceEpoch(dayNum)
+          session.execute(bndTicksByTsIntervalONEDateV3.bind
+            .setInt("tickerId", tickerId)
+            .setDate("pDate", d)
+          ).all().iterator.asScala.toSeq
+            .map(r => rowToSeqTicksWDate(r, tickerId, d))
+            .filter(elm => elm.db_tsunx >=tsBegin && elm.db_tsunx <= tsEnd)
+            .sortBy(t => t.db_tsunx)
       }
     ), System.currentTimeMillis - t1)
   }
