@@ -27,7 +27,7 @@ abstract class DBImpl(nodeAddress :String,dbType :String) {
   def getAllBarsProperties : Seq[BarCalcProperty]
   def getAllCalcProperties(fTicksMeta :FirstTickMeta,bws :Int) : CalcProperties
   def getTicksByIntervalShort(tickerId: Int, tsBegin :Long, tsEnd :Long,bws :Int) : (seqTicksObj,Long)
-  def getTicksByIntervalLong(tickerId: Int, tsBegin :Long, tsEnd :Long,bws :Int) : (seqTicksObj,Long)
+  //def getTicksByIntervalLong(tickerId: Int, tsBegin :Long, tsEnd :Long,bws :Int) : (seqTicksObj,Long)
   def getCalculatedBars(tickerId :Int, seqTicks :Seq[Tick], barDeepSec :Long) :Seq[Bar]
   def saveBars(seqBarsCalced :Seq[Bar])
   //For Bar range calculator
@@ -659,6 +659,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
   /**
     * Read while partitons and filter, order in application level.
 */
+  /*
   def getTicksByIntervalLong(tickerId: Int, tsBegin: Long, tsEnd: Long, bws :Int) :(seqTicksObj,Long) = {
     val t1 = System.currentTimeMillis
     (seqTicksObj(
@@ -676,6 +677,7 @@ class DBCass(nodeAddress :String,dbType :String) extends DBImpl(nodeAddress :Str
       }
     ), System.currentTimeMillis - t1)
   }
+  */
 
 
   //todo :opt#3 Maybe use 2 queries, when ddate_begin=ddate-end Use = in query, or >= and <=
