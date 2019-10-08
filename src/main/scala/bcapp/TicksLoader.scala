@@ -30,25 +30,25 @@ object TicksLoader extends App {
   Thread.sleep(1000)
 
 
-  val nodeFrom: String = "193.124.112.90" // remote Ultra VDS
-  val nodeTo: String = "192.168.122.192"  // local 3 instance Cluster. For cluster:
+  val nodeFrom: String = "84.201.169.181" // remote MTS
+  val nodeTo: String = "10.241.5.234"  // local 3 instance Cluster. For cluster:
 
   val sessFrom = Cluster.builder().addContactPoint(nodeFrom).build().connect()
   val sessTo = Cluster.builder().addContactPoint(nodeTo).build().connect()
 
-  sessFrom.getCluster.getConfiguration.getSocketOptions.setReadTimeoutMillis(120000)
+  sessFrom.getCluster.getConfiguration.getSocketOptions.setReadTimeoutMillis(360000)
   sessFrom.getCluster.getConfiguration.getSocketOptions.setKeepAlive(true)
 
-  sessTo.getCluster.getConfiguration.getSocketOptions.setConnectTimeoutMillis(60000)
+  sessTo.getCluster.getConfiguration.getSocketOptions.setConnectTimeoutMillis(600000)
   sessTo.getCluster.getConfiguration.getSocketOptions.setKeepAlive(true)
 
-  sessFrom.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(180);
-  sessTo.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(180);
+  sessFrom.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(360);
+  sessTo.getCluster.getConfiguration.getPoolingOptions.setHeartbeatIntervalSeconds(360);
 
 
 
 
-
+ //todo: xxx
   val bndTicksCountDays = sessFrom.prepare(""" select ticker_id,ddate,ticks_count from mts_src.ticks_count_days """).bind()
 
   val bndTicksTotal = sessFrom.prepare(""" select * from mts_src.ticks_count_total """).bind()
@@ -102,7 +102,7 @@ object TicksLoader extends App {
       * After reducing this batch size, I didn't face the exception.
       * So, maybe you are trying to load to much data into Cassandra in a single request.
     */
-    val partSqTicks = sqTicks.grouped(5000/*65535*/)
+    val partSqTicks = sqTicks.grouped(30000/*65535*/)
 
     logger.info(">>> begin BATCH for(thisPartOfSeq <- partSqTicks)")
 

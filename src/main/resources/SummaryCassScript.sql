@@ -169,7 +169,6 @@ INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,600,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,1800,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (1,3600,1);
-
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (2,30,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (2,60,1);
 INSERT INTO mts_meta.bars_property (ticker_id,bar_width_sec,is_enabled) VALUES (2,300,1);

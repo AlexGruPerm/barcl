@@ -57,15 +57,18 @@ mainClass in (Compile, packageBin) := Some("bcapp.TicksLoader")
 mainClass in (Compile, run) := Some("bcapp.TicksLoader")
 */
 
+/*
 assemblyJarName in assembly :="barcl.jar"
 mainClass in (Compile, packageBin) := Some("bcapp.BarsCalcApp")
 mainClass in (Compile, run) := Some("bcapp.BarsCalcApp")
+*/
 
 /*
 assemblyJarName in assembly :="facalc.jar"
 mainClass in (Compile, packageBin) := Some("bcapp.BarsRanger")
 mainClass in (Compile, run) := Some("bcapp.BarsRanger")
 */
+
 /*
 assemblyJarName in assembly :="formcalc.jar"
 mainClass in (Compile, packageBin) := Some("bcapp.FormsCalcApp")

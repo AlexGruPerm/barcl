@@ -22,7 +22,9 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
     val allBarsHistMeta :Seq[barsMeta] = dbInst.getAllBarsHistMeta
     logger.info("allBarsHistMeta.size="+allBarsHistMeta.size)
 
-    allBarsHistMeta.map(bh => (bh.tickerId,bh.barWidthSec)).distinct.foreach {
+    allBarsHistMeta.withFilter(b => b.tickerId==1 && b.barWidthSec==30)
+      .map(bh => (bh.tickerId,bh.barWidthSec))
+      .distinct.foreach {
         case (tickerID: Int, barWidthSec: Int) =>
           logger.info("BEFORE getLastBarFaTSEnd tickerID="+tickerID+" barWidthSec="+barWidthSec)
 
@@ -46,7 +48,7 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
         logger.info("allBars BY [" + tickerID + "," + barWidthSec + "] SIZE = " + allBars.size + "  (" + allBars.head.ts_end + " - " + allBars.last.ts_end + ") " +
           " (" + allBars.head.dDate + " - " + allBars.last.dDate + ") SIZE=" + /*SizeEstimator.estimate(dbInst) +*/ " bytes.")
 
-        val prcntsDivSize = logOpenExit.size
+        //val prcntsDivSize = logOpenExit.size
 
         val t1FAnal = System.currentTimeMillis
           val futuresFutAnalRes :Seq[Future[Seq[barsFutAnalyzeRes]]] = logOpenExit.map(p => Future{dbInst.makeAnalyze(allBars, p)})
