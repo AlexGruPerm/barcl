@@ -28,9 +28,13 @@ class BarRangeCalculator(nodeAddress :String, logOpenExit: Seq[Double]) {
         case (tickerID: Int, barWidthSec: Int) =>
           logger.info("BEFORE getLastBarFaTSEnd tickerID="+tickerID+" barWidthSec="+barWidthSec)
 
+        val minDdateAllBar :LocalDate = allBarsHistMeta.filter(b => b.tickerId == tickerID && b.barWidthSec == barWidthSec).map(_.dDate).min
+
+          logger.info(">>> minDdateAllBar = "+minDdateAllBar)
+
         val lastFaCalcedDdate: LocalDate = dbInst.getLastBarFaTSEnd(tickerID, barWidthSec) match {
           case Some(nnDdate) => nnDdate
-          case None => allBarsHistMeta.filter(b => b.tickerId == tickerID && b.barWidthSec == barWidthSec).map(_.dDate).min
+          case None => minDdateAllBar
         }
           logger.info("lastFaCalcedDdate ="+lastFaCalcedDdate)
 

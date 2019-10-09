@@ -12,7 +12,7 @@ object FormsCalcApp extends App {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
   val dbType :String = "cassandra"
-  val node :String =  config.getString(dbType+".connection.address")
+  val node :String =  config.getString(dbType+".src.ip")
 
   /**
     * Fut analyze search percents, price go up or down
